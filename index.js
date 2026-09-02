@@ -5,16 +5,28 @@ const express = require('express');
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
 const CHAT_ID = '7547417448';
 
-// Polling özelliğini kapatarak web sunucusu mantığıyla başlatıyoruz (Çökmeyi engeller)
 const bot = new TelegramBot(TOKEN, { polling: false });
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.status(200).send('SMC Sinyal Motoru 7/24 Aktif.'));
-app.listen(PORT, '0.0.0.0', () => console.log(`Sunucu aktif.`));
+
+app.get('/', (req, res) => {
+    res.status(200).send('SMC Sinyal Motoru Canli ve Aktif.');
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Sunucu ${PORT} portunda aktif.`);
+});
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🤖 Ultra SMC Vadeli İşlem Botu Sorunsuz Başlatıldı!\n\n15m mum kapanışlarında EMA, BOS, FVG ve Kurumsal Bloklar sessizce taranıyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🤖 Kendi Kendini Uyandıran Ultra SMC Botu Aktif!\n\nSunucu uykusunu engellemek için ping motoru devreye alındı. 15m mumlar taranıyor...`).catch(e => console.log(e.message));
+
+// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
+// Her 5 dakikada bir kendi web adresine istek atarak sunucuyu 7/24 uyanık tutar
+setInterval(() => {
+    axios.get('https://onrender.com').then(() => {
+        console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
+    }).catch((e) => console.log("Ping hatasi es gecildi."));
+}, 5 * 60 * 1000);
 
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
@@ -38,6 +50,7 @@ async function getFuturesSymbols() {
 }
 
 async function fullSmcStratejiTara() {
+    console.log("Binance Futures piyasası SMC kurallarına göre taranıyor...");
     try {
         const symbols = await getFuturesSymbols();
         
@@ -102,7 +115,8 @@ async function fullSmcStratejiTara() {
                 }
             }
 
-            if (yon && sinyalMaddeleri.length >= 3 && hedef > 0 && stop > 0) {
+            // Sinyal hassasiyetini kurumsal kaliteyi bozmadan 2 kurala indirdik (Sık sinyal için)
+            if (yon && sinyalMaddeleri.length >= 2 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
                 let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
@@ -125,5 +139,4 @@ async function fullSmcStratejiTara() {
     } catch (error) { console.error("SMC Tarama hatası:", error.message); }
 }
 
-// 15 dakikada bir tarama motorunu çalıştır
 setInterval(fullSmcStratejiTara, 15 * 60 * 1000);
