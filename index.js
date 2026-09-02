@@ -5,11 +5,20 @@ const express = require('express');
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
 const CHAT_ID = '7547417448';
 
+// Polling çakışmalarını önlemek için güvenli bot tanımlama
 const bot = new TelegramBot(TOKEN, { polling: true });
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('15m Full SMC Komut Botu Aktif!'));
-app.listen(PORT, () => console.log(`Web sunucusu aktif.`));
+
+// Render'ın botu canlı tutması ve hata vermemesi için web sunucu rotası
+app.get('/', (req, res) => {
+    res.send('SMC Komut Botu Aktif ve Sinyal Tarihi Takip Ediliyor.');
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
+});
 
 // BOT HAFIZASI VE AYARLARI
 let botAktif = true;
@@ -17,45 +26,45 @@ let aktifIslemler = [];
 let basariliIslemler = 0;
 let stopIslemler = 0;
 
-bot.sendMessage(CHAT_ID, `🤖 Komut Panelli Ultra SMC Vadeli İşlem Botu Başlatıldı!\n\nKomutlar:\n/baslat - Taramayı başlatır\n/durdur - Taramayı askıya alır\n/acik - Mevcut sinyalleri listeler\n/rapor - Günlük başarı istatistiği`);
+// Botun başarıyla başladığını doğrulamak için ilk mesajı gönderiyoruz
+bot.sendMessage(CHAT_ID, `🤖 Komut Panelli Ultra SMC Vadeli İşlem Botu Başlatıldı!\n\nKomutlar:\n/baslat - Taramayı başlatır\n/durdur - Taramayı askıya alır\n/acik - Mevcut sinyalleri listeler\n/rapor - Günlük başarı istatistiği`).catch(err => console.log("Telegram mesaj hatası:", err.message));
 
 // TELEGRAM KOMUT DİNLEYİCİLERİ
-bot.onText(/\/baslat/, (msg) => {
-    if (msg.chat.id.toString() !== CHAT_ID) return;
-    botAktif = true;
-    bot.sendMessage(CHAT_ID, "🟢 Tarama motoru başarıyla başlatıldı. 15 dakikalık mumlar izleniyor.");
-});
-
-bot.onText(/\/durdur/, (msg) => {
-    if (msg.chat.id.toString() !== CHAT_ID) return;
-    botAktif = false;
-    bot.sendMessage(CHAT_ID, "🔴 Tarama motoru durduruldu. Yeni sinyal gönderilmeyecek.");
-});
-
-bot.onText(/\/acik/, (msg) => {
-    if (msg.chat.id.toString() !== CHAT_ID) return;
-    if (aktifIslemler.length === 0) {
-        return bot.sendMessage(CHAT_ID, "📂 Şu anda takibe alınan aktif bir sinyal bulunmuyor.");
-    }
-    let liste = "📋 **AKTİF TAKİPTEKİ SİNYALLER**\n\n";
-    aktifIslemler.forEach((islem, idx) => {
-        liste += `${idx + 1}. 🪙 ${islem.symbol} | Yön: ${islem.yon}\n🚀 Giriş: $${islem.giris} | 🎯 TP: $${islem.tp}\n───────────────────\n`;
-    });
-    bot.sendMessage(CHAT_ID, liste);
-});
-
-bot.onText(/\/rapor/, (msg) => {
-    if (msg.chat.id.toString() !== CHAT_ID) return;
-    const toplam = basariliIslemler + stopIslemler;
-    const oran = toplam > 0 ? ((basariliIslemler / toplam) * 100).toFixed(1) : 0;
+bot.on('message', (msg) => {
+    if (!msg.text || msg.chat.id.toString() !== CHAT_ID) return;
     
-    const raporMesaji = `📊 **GÜNLÜK BAŞARI RAPORU**\n` +
-                        `───────────────────\n` +
-                        `🎯 Hedefe Ulaşan (TP): ${basariliIslemler}\n` +
-                        `🛑 Zararla Kapanan (SL): ${stopIslemler}\n` +
-                        `📈 Toplam Sinyal: ${toplam}\n` +
-                        `📐 Başarı Oranı: %${oran}`;
-    bot.sendMessage(CHAT_ID, raporMesaji);
+    const text = msg.text.trim();
+
+    if (text === '/baslat') {
+        botAktif = true;
+        bot.sendMessage(CHAT_ID, "🟢 Tarama motoru başarıyla başlatıldı. 15 dakikalık mumlar izleniyor.");
+    }
+    else if (text === '/durdur') {
+        botAktif = false;
+        bot.sendMessage(CHAT_ID, "🔴 Tarama motoru durduruldu. Yeni sinyal gönderilmeyecek.");
+    }
+    else if (text === '/acik') {
+        if (aktifIslemler.length === 0) {
+            return bot.sendMessage(CHAT_ID, "📂 Şu anda takibe alınan aktif bir sinyal bulunmuyor.");
+        }
+        let liste = "📋 **AKTİF TAKİPTEKİ SİNYALLER**\n\n";
+        aktifIslemler.forEach((islem, idx) => {
+            liste += `${idx + 1}. 🪙 ${islem.symbol} | Yön: ${islem.yon}\n🚀 Giriş: $${islem.giris} | 🎯 TP: $${islem.tp}\n───────────────────\n`;
+        });
+        bot.sendMessage(CHAT_ID, liste);
+    }
+    else if (text === '/rapor') {
+        const toplam = basariliIslemler + stopIslemler;
+        const oran = toplam > 0 ? ((basariliIslemler / toplam) * 100).toFixed(1) : 0;
+        
+        const raporMesaji = `📊 **GÜNLÜK BAŞARI RAPORU**\n` +
+                            `───────────────────\n` +
+                            `🎯 Hedefe Ulaşan (TP): ${basariliIslemler}\n` +
+                            `🛑 Zararla Kapanan (SL): ${stopIslemler}\n` +
+                            `📈 Toplam Sinyal: ${toplam}\n` +
+                            `📐 Başarı Oranı: %${oran}`;
+        bot.sendMessage(CHAT_ID, raporMesaji);
+    }
 });
 
 function hesaplaEMA(kapanislar, periyot) {
@@ -79,7 +88,6 @@ async function getFuturesSymbols() {
     } catch (error) { return []; }
 }
 
-// Aktif sinyallerin hedefe gidip gitmediğini kontrol eden takip motoru
 async function islemleriTakipEt() {
     if (aktifIslemler.length === 0) return;
     try {
@@ -124,7 +132,6 @@ async function fullSmcStratejiTara() {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
-            // Zaten takipte olan coin için yeni sinyal üretme
             if (aktifIslemler.some(islem => islem.symbol === symbol)) continue;
 
             const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=210`);
@@ -189,8 +196,6 @@ async function fullSmcStratejiTara() {
 
             if (yon && sinyalMaddeleri.length >= 3 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
-                
-                // İşlemi otomatik takip listesine ekle
                 aktifIslemler.push({ symbol, yon, giris: anlikFiyat, tp: hedef, sl: stop });
 
                 let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
@@ -202,6 +207,3 @@ async function fullSmcStratejiTara() {
                             `🎯 Giriş: ${anlikFiyat.toFixed(5)}\n` +
                             `🛑 Stop: ${stop.toFixed(5)} (%${stopYuzdesi})\n` +
                             `💰 Hedef: ${hedef.toFixed(5)}\n` +
-                            `📐 Risk/Reward: 2.05R\n` +
-                            `───────────────────\n` +
-                            `🔍 Sinyaller:\n` +
