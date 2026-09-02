@@ -5,31 +5,40 @@ const express = require('express');
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
 const CHAT_ID = '7547417448';
 
-// Polling çakışmalarını önlemek için güvenli bot tanımlama
-const bot = new TelegramBot(TOKEN, { polling: true });
+// Render'da çökme yaşamamak için poling ayarlarını optimize ediyoruz
+const bot = new TelegramBot(TOKEN, { 
+    polling: {
+        autoStart: true,
+        params: { timeout: 10 }
+    } 
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Render'ın botu canlı tutması ve hata vermemesi için web sunucu rotası
 app.get('/', (req, res) => {
-    res.send('SMC Komut Botu Aktif ve Sinyal Tarihi Takip Ediliyor.');
+    res.status(200).send('SMC Vadeli Islem Botu Canli ve Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
+    console.log(`Sunucu ${PORT} portunda basariyla calisiyor.`);
 });
 
-// BOT HAFIZASI VE AYARLARI
+// BOT HAFIZASI
 let botAktif = true;
 let aktifIslemler = [];
 let basariliIslemler = 0;
 let stopIslemler = 0;
 
-// Botun başarıyla başladığını doğrulamak için ilk mesajı gönderiyoruz
-bot.sendMessage(CHAT_ID, `🤖 Komut Panelli Ultra SMC Vadeli İşlem Botu Başlatıldı!\n\nKomutlar:\n/baslat - Taramayı başlatır\n/durdur - Taramayı askıya alır\n/acik - Mevcut sinyalleri listeler\n/rapor - Günlük başarı istatistiği`).catch(err => console.log("Telegram mesaj hatası:", err.message));
+// Hata yönetim mekanizması (Botun kapanmasını engeller)
+bot.on('polling_error', (error) => {
+    console.log("Polling Hatasi Es Gecildi:", error.message);
+});
 
-// TELEGRAM KOMUT DİNLEYİCİLERİ
+// Baslangic Mesaji
+bot.sendMessage(CHAT_ID, `🤖 Komut Panelli Ultra SMC Vadeli İşlem Botu Başlatıldı!\n\nKomutlar:\n/baslat - Taramayı başlatır\n/durdur - Taramayı askıya alır\n/acik - Mevcut sinyalleri listeler\n/rapor - Günlük başarı istatistiği`).catch(err => console.log("İlk mesaj hatası:", err.message));
+
+// TELEGRAM KOMUT ANALİZ MOTORU
 bot.on('message', (msg) => {
     if (!msg.text || msg.chat.id.toString() !== CHAT_ID) return;
     
@@ -166,13 +175,13 @@ async function fullSmcStratejiTara() {
             const bearishMitigation = !bosBear && mumlar[son - 1].close < mumlar[son - 2].low;
             const bullishMitigation = !bosBull && mumlar[son - 1].close > mumlar[son - 2].high;
 
-            let yon = null; let stop = 0; let hedef = 0; let sinyalMaddeleri = [];
+            let yon = null; let stop = 0; let hedon = 0; let sinyalMaddeleri = [];
 
             if (bearishOB || bearishFVG || bosBear) {
                 yon = "🔴 SHORT"; stop = mumlar[son - 2].high;
                 const riskMesafesi = stop - anlikFiyat;
                 if (riskMesafesi > 0) {
-                    hedef = anlikFiyat - (riskMesafesi * 2.05);
+                    hedon = anlikFiyat - (riskMesafesi * 2.05);
                     if (ema50Altinda) sinyalMaddeleri.push("- Fiyat EMA50 altında");
                     if (bosBear) sinyalMaddeleri.push("- BOS_BEAR");
                     if (bearishFVG) sinyalMaddeleri.push("- Bearish FVG");
@@ -184,7 +193,7 @@ async function fullSmcStratejiTara() {
                 yon = "🟢 LONG"; stop = mumlar[son - 2].low;
                 const riskMesafesi = anlikFiyat - stop;
                 if (riskMesafesi > 0) {
-                    hedef = anlikFiyat + (riskMesafesi * 2.05);
+                    hedon = anlikFiyat + (riskMesafesi * 2.05);
                     if (ema50Ustunde) sinyalMaddeleri.push("- Fiyat EMA50 üstünde");
                     if (bosBull) sinyalMaddeleri.push("- BOS_BULL");
                     if (bullishFVG) sinyalMaddeleri.push("- Bullish FVG");
@@ -194,9 +203,9 @@ async function fullSmcStratejiTara() {
                 }
             }
 
-            if (yon && sinyalMaddeleri.length >= 3 && hedef > 0 && stop > 0) {
+            if (yon && sinyalMaddeleri.length >= 3 && hedon > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
-                aktifIslemler.push({ symbol, yon, giris: anlikFiyat, tp: hedef, sl: stop });
+                aktifIslemler.push({ symbol, yon, giris: anlikFiyat, tp: hedon, sl: stop });
 
                 let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
                             `───────────────────\n` +
@@ -206,4 +215,3 @@ async function fullSmcStratejiTara() {
                             `───────────────────\n` +
                             `🎯 Giriş: ${anlikFiyat.toFixed(5)}\n` +
                             `🛑 Stop: ${stop.toFixed(5)} (%${stopYuzdesi})\n` +
-                            `💰 Hedef: ${hedef.toFixed(5)}\n` +
