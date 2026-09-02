@@ -1,14 +1,21 @@
-javascriptconst TelegramBot = require('node-telegram-bot-api');
+const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const express = require('express'); // Render'ın port hatası vermemesi için eklendi
 
-// Sizin Bot Token bilginiz buraya eklenmiştir
+// Sizin Bot Token ve Chat ID bilgileriniz doğrudan eklenmiştir
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
-// Buradaki tırnak içine @userinfobot'tan aldığınız ID numarasını yazın (Örn: '12345678')
-const CHAT_ID = 'BURAYA_CHAT_ID_YAZIN';
+const CHAT_ID = '7547417448';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-bot.sendMessage(CHAT_ID, "🚀 Binance Sinyal Botu Render üzerinde başarıyla başlatıldı! Anlık takip yapılıyor...");
+// Render web hizmeti kontrolü (Hata almamak için zorunlu alan)
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot aktif ve 7/24 calisiyor!'));
+app.listen(PORT, () => console.log(`Web sunucusu ${PORT} portunda baslatildi.`));
+
+// Botun calistigini dogrulamak icin Telegram'a mesaj atıyoruz
+bot.sendMessage(CHAT_ID, "🚀 Binance Sinyal Botu Render üzerinde tamamen ÜCRETSİZ planda baslatildi! Takip yapiliyor...");
 
 async function kriptoTakipEt() {
     try {
