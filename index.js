@@ -8,135 +8,118 @@ const CHAT_ID = '7547417448';
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('5m Agresif Sinyal Botu Aktif!'));
+app.get('/', (req, res) => res.send('15m SMC Pro Bot Aktif!'));
 app.listen(PORT, () => console.log(`Web sunucusu aktif.`));
 
-// ORAN AYARLARI (100$ İşlemde 10x ile 100$ Kâr / 100$ Zarar için %10 olarak ayarlandı)
-const TP_ORAN = 0.10; // %10.0 Kâr Al (10x ile %100 Kazanç -> +100$)
-const SL_ORAN = 0.10; // %10.0 Zarar Kes (10x ile %100 Kayıp / Lik -> -100$)
+bot.sendMessage(CHAT_ID, `🤖 15 Dakikalık (15m) SMC Kurumsal Sinyal Botu Başladı\n\nStrateji: Order Block + Fair Value Gap (FVG)\nZaman Dilimi: 15 Dakika (15m)`);
 
-bot.sendMessage(CHAT_ID, `🚀 5m Büyük Hedefli Futures Botu Başlatıldı!\n\nHedefler: 10x için +100$ Kâr (TP) / -100$ Zarar (SL)`);
-
-function hesaplaRSI(kapanislar, periyot = 14) {
-    if (kapanislar.length < periyot + 1) return 50;
-    let kazu = 0, kayi = 0;
-    for (let i = 1; i <= periyot; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        if (fark > 0) kazu += fark; else kayi -= fark;
-    }
-    let ortKazanc = kazu / periyot, ortKayip = kayi / periyot;
-    for (let i = periyot + 1; i < kapanislar.length; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        ortKazanc = (ortKazanc * 13 + (fark > 0 ? fark : 0)) / 14;
-        ortKayip = (ortKayip * 13 + (fark < 0 ? -fark : 0)) / 14;
-    }
-    if (ortKayip === 0) return 100;
-    return 100 - (100 / (1 + (ortKazanc / ortKayip)));
-}
-
-function hesaplaBollinger(kapanislar, periyot = 20, standartSapma = 2) {
-    if (kapanislar.length < periyot) return { ust: 0, alt: 0 };
-    const dilim = kapanislar.slice(-periyot);
-    const ortalama = dilim.reduce((a, b) => a + b, 0) / periyot;
-    const varyans = dilim.reduce((a, b) => a + Math.pow(b - ortalama, 2), 0) / periyot;
-    return { 
-        ust: ortalama + (standartSapma * Math.sqrt(varyans)), 
-        alt: ortalama - (standartSapma * Math.sqrt(varyans)) 
-    };
-}
-
-function hesaplaEMA(kapanislar, periyot) {
-    if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
-    const k = 2 / (periyot + 1);
-    let ema = kapanislar.slice(0, periyot).reduce((a, b) => a + b, 0) / periyot;
-    for (let i = periyot; i < kapanislar.length; i++) {
-        ema = (kapanislar[i] * k) + (ema * (1 - k));
-    }
-    return ema;
-}
-
-function hesaplaMACD(kapanislar) {
-    if (kapanislar.length < 35) return { histogram: 0 };
-    let ema12Dizisi = [];
-    let ema26Dizisi = [];
-    for(let i = 15; i <= kapanislar.length; i++) {
-        const altDilim = kapanislar.slice(0, i);
-        ema12Dizisi.push(hesaplaEMA(altDilim, 12));
-        ema26Dizisi.push(hesaplaEMA(altDilim, 26));
-    }
-    let macdGecmisi = [];
-    for(let i = 0; i < ema12Dizisi.length; i++) {
-        macdGecmisi.push(ema12Dizisi[i] - ema26Dizisi[i]);
-    }
-    const macdCizgisi = macdGecmisi[macdGecmisi.length - 1];
-    const sinyalCizgisi = hesaplaEMA(macdGecmisi, 9);
-    return { histogram: macdCizgisi - sinyalCizgisi };
-}
-
-async function getFuturesSymbolsAndVolume() {
+// Binance Vadeli İşlemlerden En Hacimli İlk 50 Coini Çeker
+async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
         return response.data
             .filter(item => item.symbol.endsWith('USDT'))
             .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-            .slice(0, 50); 
+            .slice(0, 50)
+            .map(c => c.symbol);
     } catch (error) { return []; }
 }
 
-async function stratejiTTara() {
+// SMC Algoritma Motoru
+async function smcStratejiTara() {
     try {
-        const topHacimliCoinler = await getFuturesSymbolsAndVolume();
+        const symbols = await getFuturesSymbols();
         
-        for (const coin of topHacimliCoinler) {
-            const symbol = coin.symbol;
-            const hacimDolar = parseFloat(coin.quoteVolume);
-
-            const res = await axios.get(`https://binance.com{symbol}&interval=5m&limit=60`);
-            const kapanislar = res.data.map(m => parseFloat(m)); 
-            const anlikFiyat = kapanislar[kapanislar.length - 1];
-
-            const rsi = hesaplaRSI(kapanislar);
-            const { ust, alt } = hesaplaBollinger(kapanislar);
+        for (const symbol of symbols) {
+            // Analiz için son 30 mumu çekiyoruz
+            const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=30`);
             
-            const ema20 = hesaplaEMA(kapanislar, 20);
-            const ema50 = hesaplaEMA(kapanislar, 50);
-            const trendYonu = ema20 > ema50 ? "📈 YUKARI (Boğa)" : "📉 AŞAĞI (Ayı)";
+            // Mum verilerini anlamlandırıyoruz
+            const mumlar = res.data.map(m => ({
+                open: parseFloat(m[1]),
+                high: parseFloat(m[2]),
+                low: parseFloat(m[3]),
+                close: parseFloat(m[4])
+            }));
 
-            const { histogram } = hesaplaMACD(kapanislar);
+            if (mumlar.length < 5) continue;
 
-            let sinyalTuru = null;
-            let tp = 0, sl = 0;
+            const sonIndeks = mumlar.length - 1;
+            const anlikFiyat = mumlar[sonIndeks].close;
 
-            if (rsi < 35 && anlikFiyat <= alt && histogram >= -0.005) {
-                sinyalTuru = "🟢 LONG (ALIM)";
-                tp = anlikFiyat * (1 + TP_ORAN); 
-                sl = anlikFiyat * (1 - SL_ORAN); 
-            } 
-            else if (rsi > 65 && anlikFiyat >= ust && histogram <= 0.005) {
-                sinyalTuru = "🔴 SHORT (SATIŞ)";
-                tp = anlikFiyat * (1 - TP_ORAN); 
-                sl = anlikFiyat * (1 + SL_ORAN); 
+            // 1. ADIM: FVG (Fair Value Gap - Fiyat Boşluğu) Tespiti
+            // Boğa FVG: 1. mumun tepesi, 3. mumun dibinin altındaysa arada boşluk kalmıştır
+            const bullishFVG = mumlar[sonIndeks - 2].high < mumlar[sonIndeks].low;
+            // Ayı FVG: 1. mumun dibi, 3. mumun tepesinin üzerindeyse aşağı yönlü boşluk vardır
+            const bearishFVG = mumlar[sonIndeks - 2].low > mumlar[sonIndeks].high;
+
+            // 2. ADIM: Order Block (Kurumsal Emir Bloğu) Tespiti
+            // Bullish OB: Sert yükselişten önceki son düşüş mumu (Kurumsal alım bölgesi)
+            const bullishOB = mumlar[sonIndeks - 1].close > mumlar[sonIndeks - 1].open && mumlar[sonIndeks - 2].close < mumlar[sonIndeks - 2].open;
+            // Bearish OB: Sert düşüşten önceki son yükseliş mumu (Kurumsal satış bölgesi)
+            const bearishOB = mumlar[sonIndeks - 1].close < mumlar[sonIndeks - 1].open && mumlar[sonIndeks - 2].close > mumlar[sonIndeks - 2].open;
+
+            let yön = null;
+            let stop = 0, hedef = 0;
+            let sinyalMaddeleri = [];
+
+            // LONG SINYAL TETIKLENME ŞARTI (OB + FVG UYUMU)
+            if (bullishOB && bullishFVG) {
+                yön = "🟢 LONG";
+                stop = mumlar[sonIndeks - 2].low; // Zarar kes en dip iğne ucu
+                const riskMesafesi = anlikFiyat - stop;
+                
+                if (riskMesafesi > 0) {
+                    hedef = anlikFiyat + (riskMesafesi * 2.05); // Tam 2.05R Risk/Reward kazanç hedefi
+                    sinyalMaddeleri = [
+                        "- Fiyat yükseliş trendinde",
+                        "- Bullish FVG (Fiyat Boşluğu) yakalandı",
+                        "- Bullish Order Block (Kurumsal Alım Bölgesi)"
+                    ];
+                }
+            }
+            // SHORT SINYAL TETIKLENME ŞARTI (OB + FVG UYUMU)
+            else if (bearishOB && bearishFVG) {
+                yön = "🔴 SHORT";
+                stop = mumlar[sonIndeks - 2].high; // Zarar kes en tepe iğne ucu
+                const riskMesafesi = stop - anlikFiyat;
+                
+                if (riskMesafesi > 0) {
+                    hedef = anlikFiyat - (riskMesafesi * 2.05); // Tam 2.05R Risk/Reward kazanç hedefi
+                    sinyalMaddeleri = [
+                        "- Fiyat düşüş trendinde",
+                        "- Bearish FVG (Fiyat Boşluğu) yakalandı",
+                        "- Bearish Order Block (Kurumsal Satış Bölgesi)"
+                    ];
+                }
             }
 
-            if (sinyalTuru) {
-                const temizIsim = symbol.replace('USDT', ' / USDT');
-                const milyonHacim = (hacimDolar / 1000000).toFixed(2);
+            // Eğer bir SMC yapısı oluşmuşsa videodaki tasarımla Telegram'a gönder
+            if (yön && hedef > 0 && stop > 0) {
+                const temizIsim = symbol;
+                const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
-                const mesaj = `⚡ #FUTURES 5M BÜYÜK HEDEF\n\n` +
-                              `🪙 Coin: ${temizIsim}\n` +
-                              `📊 İşlem: ${sinyalTuru}\n` +
-                              `🔄 Trend Yönü: ${trendYonu}\n` +
-                              `💰 24S Hacim: $${milyonHacim}M\n\n` +
-                              `🚀 GİRİŞ: $${anlikFiyat.toFixed(4)}\n\n` +
-                              `🎯 KÂR AL (TP): $${tp.toFixed(4)} (+100$ Kâr)\n` +
-                              `🛑 ZARAR KES (SL): $${sl.toFixed(4)} (-100$ Zarar / LİK)\n\n` +
-                              `📈 RSI: ${rsi.toFixed(2)}\n` +
-                              `💡 Not: Hesaplamalar 100$ bakiye ve 10x kaldıraç için birebir ayarlanmıştır.`;
-                
+                let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
+                            `───────────────────\n` +
+                            `📌 Coin: ${temizIsim}\n` +
+                            `📊 Yön: ${yön}\n` +
+                            `⏱️ Zaman Dilimi: 15 Dakika\n` +
+                            `───────────────────\n` +
+                            `🎯 Giriş: ${anlikFiyat.toFixed(5)}\n` +
+                            `🛑 Stop: ${stop.toFixed(5)} (%${stopYuzdesi})\n` +
+                            `💰 Hedef: ${hedef.toFixed(5)}\n` +
+                            `📐 Risk/Reward: 2.05R\n` +
+                            `───────────────────\n` +
+                            `🔍 Sinyaller:\n` +
+                            sinyalMaddeleri.join('\n');
+
                 bot.sendMessage(CHAT_ID, mesaj);
             }
         }
-    } catch (error) { console.error("Tarama hatası:", error.message); }
+    } catch (error) {
+        console.error("SMC Tarama hatası:", error.message);
+    }
 }
 
-setInterval(stratejiTTara, 5 * 60 * 1000);
+// Botun her 15 dakikada bir (15 * 60 * 1000 ms) mum kapanışlarında tarama yapmasını sağlıyoruz
+setInterval(smcStratejiTara, 15 * 60 * 1000);
