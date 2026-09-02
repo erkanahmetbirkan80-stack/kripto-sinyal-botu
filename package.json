@@ -1,4 +1,4 @@
-json{
+{
   "name": "kripto-sinyal-botu",
   "version": "1.0.0",
   "description": "",
@@ -11,4 +11,3 @@ json{
     "node-telegram-bot-api": "^0.64.0"
   }
 }
-Use code with caution.
