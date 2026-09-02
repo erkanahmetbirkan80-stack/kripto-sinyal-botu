@@ -8,12 +8,21 @@ const CHAT_ID = '7547417448';
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('15m SMC Pro Bot Aktif!'));
+app.get('/', (req, res) => res.send('15m Full SMC Bot Aktif!'));
 app.listen(PORT, () => console.log(`Web sunucusu aktif.`));
 
-bot.sendMessage(CHAT_ID, `🤖 15 Dakikalık (15m) SMC Kurumsal Sinyal Botu Başladı\n\nStrateji: Order Block + Fair Value Gap (FVG)\nZaman Dilimi: 15 Dakika (15m)`);
+bot.sendMessage(CHAT_ID, `🤖 Ultra SMC + Price Action Vadeli İşlem Botu Başlatıldı!\n\nTarama Kuralları: EMA Trend, BOS, FVG, Order Block, Breaker Block, Mitigation Block tamamen aktif.`);
 
-// Binance Vadeli İşlemlerden En Hacimli İlk 50 Coini Çeker
+function hesaplaEMA(kapanislar, periyot) {
+    if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
+    const k = 2 / (periyot + 1);
+    let ema = kapanislar.slice(0, periyot).reduce((a, b) => a + b, 0) / periyot;
+    for (let i = periyot; i < kapanislar.length; i++) {
+        ema = (kapanislar[i] * k) + (ema * (1 - k));
+    }
+    return ema;
+}
+
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
@@ -25,16 +34,13 @@ async function getFuturesSymbols() {
     } catch (error) { return []; }
 }
 
-// SMC Algoritma Motoru
-async function smcStratejiTara() {
+async function fullSmcStratejiTara() {
     try {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
-            // Analiz için son 30 mumu çekiyoruz
-            const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=30`);
+            const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=210`);
             
-            // Mum verilerini anlamlandırıyoruz
             const mumlar = res.data.map(m => ({
                 open: parseFloat(m[1]),
                 high: parseFloat(m[2]),
@@ -42,66 +48,83 @@ async function smcStratejiTara() {
                 close: parseFloat(m[4])
             }));
 
-            if (mumlar.length < 5) continue;
+            if (mumlar.length < 200) continue;
 
-            const sonIndeks = mumlar.length - 1;
-            const anlikFiyat = mumlar[sonIndeks].close;
+            const son = mumlar.length - 1;
+            const anlikFiyat = mumlar[son].close;
+            const kapanislar = mumlar.map(m => m.close);
 
-            // 1. ADIM: FVG (Fair Value Gap - Fiyat Boşluğu) Tespiti
-            // Boğa FVG: 1. mumun tepesi, 3. mumun dibinin altındaysa arada boşluk kalmıştır
-            const bullishFVG = mumlar[sonIndeks - 2].high < mumlar[sonIndeks].low;
-            // Ayı FVG: 1. mumun dibi, 3. mumun tepesinin üzerindeyse aşağı yönlü boşluk vardır
-            const bearishFVG = mumlar[sonIndeks - 2].low > mumlar[sonIndeks].high;
+            // 1. EMA 50 ve EMA 200 Trend Kuralları
+            const ema50 = hesaplaEMA(kapanislar, 50);
+            const ema200 = hesaplaEMA(kapanislar, 200);
+            const ema50Altinda = anlikFiyat < ema50;
+            const ema50Ustunde = anlikFiyat > ema50;
 
-            // 2. ADIM: Order Block (Kurumsal Emir Bloğu) Tespiti
-            // Bullish OB: Sert yükselişten önceki son düşüş mumu (Kurumsal alım bölgesi)
-            const bullishOB = mumlar[sonIndeks - 1].close > mumlar[sonIndeks - 1].open && mumlar[sonIndeks - 2].close < mumlar[sonIndeks - 2].open;
-            // Bearish OB: Sert düşüşten önceki son yükseliş mumu (Kurumsal satış bölgesi)
-            const bearishOB = mumlar[sonIndeks - 1].close < mumlar[sonIndeks - 1].open && mumlar[sonIndeks - 2].close > mumlar[sonIndeks - 2].open;
+            // 2. FVG Tespiti
+            const bearishFVG = mumlar[son - 2].low > mumlar[son].high;
+            const bullishFVG = mumlar[son - 2].high < mumlar[son].low;
+
+            // 3. BOS (Break of Structure - Yapı Kırılımı)
+            let bosBear = false, bosBull = false;
+            const sonDusuk = Math.min(...mumlar.slice(son - 10, son - 2).map(m => m.low));
+            const sonYuksek = Math.max(...mumlar.slice(son - 10, son - 2).map(m => m.high));
+            if (mumlar[son - 1].close < sonDusuk) bosBear = true;
+            if (mumlar[son - 1].close > sonYuksek) bosBull = true;
+
+            // 4. Order Block (Emir Blokları)
+            const bearishOB = mumlar[son - 1].close < mumlar[son - 1].open && mumlar[son - 2].close > mumlar[son - 2].open;
+            const bullishOB = mumlar[son - 1].close > mumlar[son - 1].open && mumlar[son - 2].close < mumlar[son - 2].open;
+
+            // 5. Breaker & Mitigation Block Simülasyonu
+            const bearishBreaker = bosBear && mumlar[son - 1].close < mumlar[son - 3].low;
+            const bullishBreaker = bosBull && mumlar[son - 1].close > mumlar[son - 3].high;
+            const bearishMitigation = !bosBear && mumlar[son - 1].close < mumlar[son - 2].low;
+            const bullishMitigation = !bosBull && mumlar[son - 1].close > mumlar[son - 2].high;
 
             let yön = null;
             let stop = 0, hedef = 0;
             let sinyalMaddeleri = [];
 
-            // LONG SINYAL TETIKLENME ŞARTI (OB + FVG UYUMU)
-            if (bullishOB && bullishFVG) {
-                yön = "🟢 LONG";
-                stop = mumlar[sonIndeks - 2].low; // Zarar kes en dip iğne ucu
-                const riskMesafesi = anlikFiyat - stop;
-                
-                if (riskMesafesi > 0) {
-                    hedef = anlikFiyat + (riskMesafesi * 2.05); // Tam 2.05R Risk/Reward kazanç hedefi
-                    sinyalMaddeleri = [
-                        "- Fiyat yükseliş trendinde",
-                        "- Bullish FVG (Fiyat Boşluğu) yakalandı",
-                        "- Bullish Order Block (Kurumsal Alım Bölgesi)"
-                    ];
-                }
-            }
-            // SHORT SINYAL TETIKLENME ŞARTI (OB + FVG UYUMU)
-            else if (bearishOB && bearishFVG) {
+            // SHORT (AYI) ŞARTLARI BİRLEŞİMİ
+            if (bearishOB || bearishFVG || bosBear) {
                 yön = "🔴 SHORT";
-                stop = mumlar[sonIndeks - 2].high; // Zarar kes en tepe iğne ucu
+                stop = mumlar[son - 2].high;
                 const riskMesafesi = stop - anlikFiyat;
                 
                 if (riskMesafesi > 0) {
-                    hedef = anlikFiyat - (riskMesafesi * 2.05); // Tam 2.05R Risk/Reward kazanç hedefi
-                    sinyalMaddeleri = [
-                        "- Fiyat düşüş trendinde",
-                        "- Bearish FVG (Fiyat Boşluğu) yakalandı",
-                        "- Bearish Order Block (Kurumsal Satış Bölgesi)"
-                    ];
+                    hedef = anlikFiyat - (riskMesafesi * 2.05);
+                    if (ema50Altinda) sinyalMaddeleri.push("- Fiyat EMA50 altında");
+                    if (bosBear) sinyalMaddeleri.push("- BOS_BEAR");
+                    if (bearishFVG) sinyalMaddeleri.push("- Bearish FVG");
+                    if (bearishBreaker) sinyalMaddeleri.push("- Bearish Breaker Block");
+                    if (bearishOB) sinyalMaddeleri.push("- Bearish Order Block");
+                    if (bearishMitigation) sinyalMaddeleri.push("- Bearish Mitigation Block");
+                }
+            }
+            // LONG (BOĞA) ŞARTLARI BİRLEŞİMİ
+            else if (bullishOB || bullishFVG || bosBull) {
+                yön = "🟢 LONG";
+                stop = mumlar[son - 2].low;
+                const riskMesafesi = anlikFiyat - stop;
+                
+                if (riskMesafesi > 0) {
+                    hedef = anlikFiyat + (riskMesafesi * 2.05);
+                    if (ema50Ustunde) sinyalMaddeleri.push("- Fiyat EMA50 üstünde");
+                    if (bosBull) sinyalMaddeleri.push("- BOS_BULL");
+                    if (bullishFVG) sinyalMaddeleri.push("- Bullish FVG");
+                    if (bullishBreaker) sinyalMaddeleri.push("- Bullish Breaker Block");
+                    if (bullishOB) sinyalMaddeleri.push("- Bullish Order Block");
+                    if (bullishMitigation) sinyalMaddeleri.push("- Bullish Mitigation Block");
                 }
             }
 
-            // Eğer bir SMC yapısı oluşmuşsa videodaki tasarımla Telegram'a gönder
-            if (yön && hedef > 0 && stop > 0) {
-                const temizIsim = symbol;
+            // Sinyal mesajını gönder (En az 3 kural aynı anda tetiklendiyse sinyal kalitesini korur)
+            if (yön && sinyalMaddeleri.length >= 3 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
                 let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
                             `───────────────────\n` +
-                            `📌 Coin: ${temizIsim}\n` +
+                            `📌 Coin: ${symbol}\n` +
                             `📊 Yön: ${yön}\n` +
                             `⏱️ Zaman Dilimi: 15 Dakika\n` +
                             `───────────────────\n` +
@@ -121,5 +144,4 @@ async function smcStratejiTara() {
     }
 }
 
-// Botun her 15 dakikada bir (15 * 60 * 1000 ms) mum kapanışlarında tarama yapmasını sağlıyoruz
-setInterval(smcStratejiTara, 15 * 60 * 1000);
+setInterval(fullSmcStratejiTara, 15 * 60 * 1000);
