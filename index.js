@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.status(200).send('Scalp Sinyal Motoru Canli.');
+    res.status(200).send('Scalp Sinyal Motoru Canli ve Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
@@ -52,7 +52,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-const SPOT_BASE = 'https://api.binance.com/api/v3'; 
+const SPOT_BASE = 'https://binance.com'; 
 
 async function getTopSymbols() {
     try {
@@ -68,48 +68,19 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN ÇÖZÜM: Tırnak işaretli string veriyi milimetrik doğru okuyan test fonksiyonu
-async function dogrulanmisTestSinyaliGonder() {
-    console.log("Binance'ten canlı SOL fiyatı çekiliyor...");
-    try {
-        const res = await axios.get(`${SPOT_BASE}/ticker/price?symbol=SOLUSDT`);
-        if (res.data && res.data.price) {
-            const anlikFiyat = parseFloat(res.data.price); 
-            
-            if (!isNaN(anlikFiyat) && anlikFiyat > 0) {
-                const stop = anlikFiyat * 0.9925;
-                const hedef = anlikFiyat * 1.0150;
-
-                let mesaj = `🚨 *SCALP BOTU KESİN BAŞARI TESTİ* 🚨\n` +
-                            `───────────────────\n` +
-                            `📌 *Coin:* SOLUSDT (Solana)\n` +
-                            `📊 *Yön:* 🟢 LONG (ALIM / FUTURES TEST)\n` +
-                            `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
-                            `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* $${anlikFiyat.toFixed(2)}\n` +
-                            `🛑 *Stop Seviyesi:* $${stop.toFixed(2)} (%0.75)\n` +
-                            `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
-                            `───────────────────\n` +
-                            `🔍 *Sistem Durumu:*\n` +
-                            `• Veri Ayrıştırma Hatası: %100 ÇÖZÜLDÜ ✅\n` +
-                            `• Gerçek Canlı Tarama: BAŞLATILDI ⚙️`;
-
-                await bot.sendMessage(CHAT_ID, mesaj);
-                console.log("Hatasız fiyatlı test sinyali başarıyla fırlatıldı.");
-            }
-        }
-    } catch (error) { console.error("Test fonksiyon hatası:", error.message); }
-}
-
 async function scalpStratejiTara() {
     console.log("Binance piyasası kısıtlamasız köprü üzerinden taranıyor...");
     try {
         const symbols = await getTopSymbols();
+        
+        // Açılışta çalıştığını kanıtlamak için ilk tetiklendiğinde Telegram'a bilgi atıyoruz
+        await bot.sendMessage(CHAT_ID, `⚙️ *Scalp Motoru Aktif:* 40 adet hacimli kripto varlık 5m grafikte taranıyor...`).catch(() => null);
+
         for (const symbol of symbols) {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // 🔥 KESİN DÜZELTME: Her bir mum alt dizisindeki (m) 4. indeksteki (Kapanış) veriyi doğru ayrıştırıyoruz!
+            // Her bir mumnun kapanış değerini milimetrik doğru ayrıştırıyoruz
             const kapanislar = res.data.map(m => parseFloat(m[4])); 
             
             const sonIdx = kapanislar.length - 1;
@@ -153,10 +124,6 @@ async function scalpStratejiTara() {
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-async function anaDongu() {
-    await dogrulanmisTestSinyaliGonder();
-    setTimeout(scalpStratejiTara, 10000);
-}
-
-anaDongu();
+// Hatalı test fonksiyonları arındırıldı, doğrudan ana motor tetikleniyor
+scalpStratejiTara();
 setInterval(scalpStratejiTara, 5 * 60 * 1000);
