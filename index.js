@@ -92,26 +92,26 @@ async function scalpStratejiTara() {
             
             if (!Array.isArray(res.data) || res.data.length < 50) continue;
 
-            const kapanislar = res.data.map(m => parseFloat(m[4])); // Sadece kapanış fiyatları dizisi
+            const kapanislar = res.data.map(m => parseFloat(m[4])); // HATASIZ İNDEKS: Kapanış fiyatları doğru indekslendi
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
 
-            // İndikatör Değerlerini Hesapla
-            const rsi Değeri = hesaplaRSI(kapanislar, 14);
-            const ema20 Değeri = hesaplaEMA(kapanislar, 20);
+            // BOŞLUK HATALARI DÜZELTİLDİ: Değişken isimleri birleştirildi
+            const rsiDegeri = hesaplaRSI(kapanislar, 14);
+            const ema20Degeri = hesaplaEMA(kapanislar, 20);
 
             let yon = null;
             let stop = 0;
             let hedef = 0;
 
             // 🟢 LONG KOŞULU: RSI aşırı satımdaysa (< 35) ve fiyat EMA 20'nin üzerindeyse
-            if (rsiDeğeri < 35 && anlikFiyat > ema20Değeri) {
+            if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)";
                 stop = anlikFiyat * 0.9925; // %0.75 Stop mesafesi
                 hedef = anlikFiyat * 1.0150; // %1.50 Kar Al mesafesi
             } 
             // 🔴 SHORT KOŞULU: RSI aşırı alımdaysa (> 65) ve fiyat EMA 20'nin altındaysa
-            else if (rsiDeğeri > 65 && anlikFiyat < ema20Değeri) {
+            else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
                 yon = "🔴 SHORT (SATIM)";
                 stop = anlikFiyat * 1.0075; // %0.75 Stop mesafesi
                 hedef = anlikFiyat * 0.9850; // %1.50 Kar Al mesafesi
@@ -129,8 +129,8 @@ async function scalpStratejiTara() {
                             `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
                             `───────────────────\n` +
                             `🔍 *Göstergeler:*\n` +
-                            `- RSI (14): ${rsiDeğeri.toFixed(2)}\n` +
-                            `- EMA (20): ${ema20Değeri.toFixed(5)}`;
+                            `- RSI (14): ${rsiDegeri.toFixed(2)}\n` +
+                            `- EMA (20): ${ema20Degeri.toFixed(5)}`;
 
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
