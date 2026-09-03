@@ -10,11 +10,15 @@ const bot = new TelegramBot(TOKEN, { polling: false });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 🛠️ KESİN DÜZELTME: Webhook verilerinin Express tarafından tam okunabilmesi için parser genişletildi
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Telegram Webhook Mesaj Yakalayıcı
+// Telegram Webhook Giriş Kapısı (Endpoint)
 app.post(`/bot${TOKEN}`, (req, res) => {
-    bot.processUpdate(req.body);
+    if (req.body) {
+        bot.processUpdate(req.body);
+    }
     res.sendStatus(200);
 });
 
@@ -32,7 +36,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
 });
 
-// UYUMAYI ENGELLEYEN PİNG MOTORU
+// Sunucuyu uyanık tutan ping motoru
 setInterval(() => {
     axios.get(RENDER_URL).then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -84,16 +88,25 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🎯 CANLI ANALİZ KOMUT MOTORU
-bot.onText(/\/analiz (.+)/, async (msg, match) => {
+// 🎯 CANLI ANALİZ KOMUT MOTORU (Yedekli Kelime Yakalama Altyapısı)
+bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    if (!match || !match[1]) {
+    // Güvenli Kelime Süzme (match[1] yoksa doğrudan msg.text üzerinden süzme yapar)
+    let hamGirdi = "";
+    if (match && match[1]) {
+        hamGirdi = match[1];
+    } else if (msg.text) {
+        hamGirdi = msg.text.replace(/\/analiz/i, "");
+    }
+
+    hamGirdi = hamGirdi.toUpperCase().trim();
+
+    if (!hamGirdi) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL`").catch(() => null);
     }
     
-    let gelenCoin = match[1].toUpperCase().trim(); 
-    
+    let gelenCoin = hamGirdi;
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
     }
@@ -108,7 +121,6 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
-        // 🔥 KRİTİK DÜZELTME: Binance mum dizisindeki 4. indeks (Kapanış fiyatı) çekildi
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -156,7 +168,6 @@ async function scalpStratejiTara() {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // 🔥 KRİTİK DÜZELTME: Tarayıcı motoru için de 4. indeks düzeltildi
             const kapanislar = res.data.map(m => parseFloat(m[4])); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
@@ -168,7 +179,7 @@ async function scalpStratejiTara() {
 
             if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
 
-            let yon = null; let stop = 0; let hedef = 0;
+            let yon = null; let stop = 0; let原型hedef = 0; let hedef = 0;
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
             } else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
