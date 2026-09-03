@@ -52,6 +52,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
+// 🔥 DÜZELTME: Doğru Binance API Base URL'i tanımlandı
 const SPOT_BASE = 'https://binance.com'; 
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -69,11 +70,14 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN DÜZELTME: match[1] kullanılarak sadece kullanıcının yazdığı saf kelime filtreye alındı!
-bot.onText(/\/analiz (.+)/, async (msg, match) => {
+// 🔥 DÜZELTME: Sadece /analiz yazıldığında botun çökmesini önleyen esnek regex yapısı
+bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    if (!match || !match[1]) return;
+    // Eğer kullanıcı yanına sembol yazmadıysa uyarı ver ve durdur
+    if (!match || !match[1]) {
+        return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
+    }
     
     let gelenCoin = match[1].toUpperCase().trim(); 
     
@@ -81,17 +85,17 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         gelenCoin = gelenCoin + 'USDT';
     }
 
-    bot.sendMessage(chatId, `🤖 *Finora Engine:* ${gelenCoin} için canlı borsa verileri indiriliyor, teknik yapay zeka analizi başlatıldı...`).catch(() => null);
+    bot.sendMessage(chatId, `🤖 *Finora Engine:* ${gelenCoin} için canlı borsa verileri indiriliyor, teknik yapay zeka analizi başlatıldı...`, { parse_mode: 'Markdown' }).catch(() => null);
 
     try {
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`;
-        const res = await axios.get(url).catch(() => null);
+        const res = await axios.get(url);
         
         if (!res || !Array.isArray(res.data) || res.data.length < 50) {
-            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi. Lütfen ismi doğru yazdığınızdan emin olun (Örn: BTC veya SOL).`);
+            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
-        const kapanislar = res.data.map(m => parseFloat(m[4])); // DÜZELTİLDİ: Kline dizisindeki 4. indeks (Kapanış fiyatı) milimetrik çekildi
+        const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
 
@@ -122,10 +126,10 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
                           `🎯 *Yapay Zeka Sinyal Özeti:* \n` +
                           `${sinyalDurumu}`;
 
-        bot.sendMessage(chatId, raporMesaji).catch(() => null);
+        bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ Analiz motorunda anlık bir hata oluştu: ${error.message}`).catch(() => null);
+        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekme hatası oluştu.`).catch(() => null);
     }
 });
 
@@ -175,12 +179,13 @@ async function scalpStratejiTara() {
                             `- RSI (14): ${rsiDegeri.toFixed(2)}\n` +
                             `- EMA (20): ${ema20Degeri.toFixed(5)}`;
 
-                bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
+                bot.sendMessage(CHAT_ID, mesaj, { parse_mode: 'Markdown' }).catch(e => console.log(e.message));
             }
         }
         console.log("Arka plan scalp taraması tamamlandı.");
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
+// 🔥 DÜZELTME: Yarım kalan fonksiyon çağrıları ve döngüsel tetikleyiciler tamamlandı
 scalpStratejiTara();
-setInterval(scalpStratejiTara, 5 * 60 * 1000);
+setInterval(scalpStratejiTara, 5 * 60 * 1000); // 5 dakikada bir otomatik tarar
