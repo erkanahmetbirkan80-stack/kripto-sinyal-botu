@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.status(200).send('SMC Sinyal Motoru Canli ve Aktif.');
+    res.status(200).send('Scalp Sinyal Motoru Canli ve Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
@@ -18,7 +18,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🚀 SMC Botu Ultra Agresif Modda Aktif!\n\nMum limitleri optimize edildi. Sinyaller bekleniyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🚀 *Kripto Scalp Sinyal Botu Canlandı!*\n\nRSI ve EMA 20 Göstergeleri Aktif. 5m grafikte 50 coin kesintisiz taranıyor...`).catch(e => console.log(e.message));
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
@@ -27,6 +27,7 @@ setInterval(() => {
     }).catch((e) => console.log("Ping hatasi es gecildi."));
 }, 5 * 60 * 1000);
 
+// Saf Matematiksel EMA Hesaplama Fonksiyonu
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -37,6 +38,33 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
+// Saf Matematiksel RSI Hesaplama Fonksiyonu
+function hesaplaRSI(kapanislar, periyot = 14) {
+    if (kapanislar.length < periyot + 1) return 50;
+    let kazaclar = 0;
+    let kayiplar = 0;
+
+    for (let i = 1; i <= periyot; i++) {
+        let fark = kapanislar[i] - kapanislar[i - 1];
+        if (fark > 0) kazaclar += fark;
+        else kayiplar += Math.abs(fark);
+    }
+
+    let ortalamaKazanc = kazaclar / periyot;
+    let ortalamaKayip = kayiplar / periyot;
+
+    for (let i = periyot + 1; i < kapanislar.length; i++) {
+        let fark = kapanislar[i] - kapanislar[i - 1];
+        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
+        ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
+    }
+
+    if (ortalamaKayip === 0) return 100;
+    let rs = ortalamaKazanc / ortalamaKayip;
+    return 100 - (100 / (1 + rs));
+}
+
+// Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken bağlantı
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
@@ -54,95 +82,65 @@ async function getFuturesSymbols() {
     }
 }
 
-async function fullSmcStratejiTara() {
-    console.log("Binance Futures piyasası 5m grafikte milimetrik taranıyor...");
+async function scalpStratejiTara() {
+    console.log("Binance Futures piyasası RSI & EMA kurallarına göre taranıyor...");
     try {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
             const res = await axios.get(`https://binance.com{symbol}&interval=5m&limit=100`);
             
-            if (!Array.isArray(res.data) || res.data.length < 60) continue; // DÜZELTİLDİ: Sınırı 200'den 60 muma düşürdük.
+            if (!Array.isArray(res.data) || res.data.length < 50) continue;
 
-            const mumlar = res.data.map(m => ({
-                open: parseFloat(m[1]), 
-                high: parseFloat(m[2]), 
-                low: parseFloat(m[3]), 
-                close: parseFloat(m[4])
-            }));
+            const kapanislar = res.data.map(m => parseFloat(m[4])); // Sadece kapanış fiyatları dizisi
+            const sonIdx = kapanislar.length - 1;
+            const anlikFiyat = kapanislar[sonIdx];
 
-            const son = mumlar.length - 1;
-            const anlikFiyat = mumlar[son].close;
-            const kapanislar = mumlar.map(m => m.close);
+            // İndikatör Değerlerini Hesapla
+            const rsi Değeri = hesaplaRSI(kapanislar, 14);
+            const ema20 Değeri = hesaplaEMA(kapanislar, 20);
 
-            const ema50 = hesaplaEMA(kapanislar, 50);
-            const ema50Altinda = anlikFiyat < ema50;
-            const ema50Ustunde = anlikFiyat > ema50;
+            let yon = null;
+            let stop = 0;
+            let hedef = 0;
 
-            const bearishFVG = mumlar[son - 2].low > mumlar[son].high;
-            const bullishFVG = mumlar[son - 2].high < mumlar[son].low;
-
-            let bosBear = false, bosBull = false;
-            const sonDusuk = Math.min(...mumlar.slice(son - 10, son - 2).map(m => m.low));
-            const sonYuksek = Math.max(...mumlar.slice(son - 10, son - 2).map(m => m.high));
-            if (mumlar[son - 1].close < sonDusuk) bosBear = true;
-            if (mumlar[son - 1].close > sonYuksek) bosBull = true;
-
-            const bearishOB = mumlar[son - 1].close < mumlar[son - 1].open && mumlar[son - 2].close > mumlar[son - 2].open;
-            const bullishOB = mumlar[son - 1].close > mumlar[son - 1].open && mumlar[son - 2].close < mumlar[son - 2].open;
-
-            const bearishBreaker = bosBear && mumlar[son - 1].close < mumlar[son - 3].low;
-            const bullishBreaker = bosBull && mumlar[son - 1].close > mumlar[son - 3].high;
-            const bearishMitigation = !bosBear && mumlar[son - 1].close < mumlar[son - 2].low;
-            const bullishMitigation = !bosBull && mumlar[son - 1].close > mumlar[son - 2].high;
-
-            let yon = null; let stop = 0; let hedef = 0; let sinyalMaddeleri = [];
-
-            // KRİTER ESNETİLDİ: Tek bir formasyon bile sinyal için yeterli
-            if (bearishOB || bearishFVG || bosBear) {
-                yon = "🔴 SHORT"; stop = mumlar[son - 2].high;
-                const riskMesafesi = stop - anlikFiyat;
-                if (riskMesafesi > 0) {
-                    hedef = anlikFiyat - (riskMesafesi * 1.5); // Risk ödül oranını daha kolay gerçekleşmesi için 1.5R yaptık
-                    if (ema50Altinda) sinyalMaddeleri.push("- Fiyat EMA50 altında");
-                    if (bosBear) sinyalMaddeleri.push("- BOS_BEAR");
-                    if (bearishFVG) sinyalMaddeleri.push("- Bearish FVG");
-                    if (bearishOB) sinyalMaddeleri.push("- Bearish Order Block");
-                }
-            } else if (bullishOB || bullishFVG || bosBull) {
-                yon = "🟢 LONG"; stop = mumlar[son - 2].low;
-                const riskMesafesi = anlikFiyat - stop;
-                if (riskMesafesi > 0) {
-                    hedef = anlikFiyat + (riskMesafesi * 1.5);
-                    if (ema50Ustunde) sinyalMaddeleri.push("- Fiyat EMA50 üstünde");
-                    if (bosBull) sinyalMaddeleri.push("- BOS_BULL");
-                    if (bullishFVG) sinyalMaddeleri.push("- Bullish FVG");
-                    if (bullishOB) sinyalMaddeleri.push("- Bullish Order Block");
-                }
+            // 🟢 LONG KOŞULU: RSI aşırı satımdaysa (< 35) ve fiyat EMA 20'nin üzerindeyse
+            if (rsiDeğeri < 35 && anlikFiyat > ema20Değeri) {
+                yon = "🟢 LONG (ALIM)";
+                stop = anlikFiyat * 0.9925; // %0.75 Stop mesafesi
+                hedef = anlikFiyat * 1.0150; // %1.50 Kar Al mesafesi
+            } 
+            // 🔴 SHORT KOŞULU: RSI aşırı alımdaysa (> 65) ve fiyat EMA 20'nin altındaysa
+            else if (rsiDeğeri > 65 && anlikFiyat < ema20Değeri) {
+                yon = "🔴 SHORT (SATIM)";
+                stop = anlikFiyat * 1.0075; // %0.75 Stop mesafesi
+                hedef = anlikFiyat * 0.9850; // %1.50 Kar Al mesafesi
             }
 
-            if (yon && sinyalMaddeleri.length >= 1 && hedef > 0 && stop > 0) {
-                const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
-                
-                let mesaj = `⚡ YENİ SİNYAL ⚡\n` +
+            if (yon) {
+                let mesaj = `⚡ *YENİ SCALP SİNYALİ* ⚡\n` +
                             `───────────────────\n` +
-                            `📌 Coin: ${symbol}\n` +
-                            `📊 Yön: ${yon}\n` +
-                            `⏱️ Zaman Dilimi: 5 Dakika\n` +
+                            `📌 *Coin:* ${symbol}\n` +
+                            `📊 *Yön:* ${yon}\n` +
+                            `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
                             `───────────────────\n` +
-                            `🎯 Giriş: ${anlikFiyat}\n` +
-                            `🛑 Stop: ${stop} (%${stopYuzdesi})\n` +
-                            `💰 Hedef: ${hedef}\n` +
+                            `🎯 *Giriş Fiyatı:* ${anlikFiyat}\n` +
+                            `🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n` +
+                            `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
                             `───────────────────\n` +
-                            `🔍 Sinyaller:\n` +
-                            sinyalMaddeleri.join('\n');
+                            `🔍 *Göstergeler:*\n` +
+                            `- RSI (14): ${rsiDeğeri.toFixed(2)}\n` +
+                            `- EMA (20): ${ema20Değeri.toFixed(5)}`;
 
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
-        console.log("5m milimetrik taraması tamamlandı. Sorun yok.");
-    } catch (error) { console.error("SMC Tarama hatası:", error.message); }
+        console.log("Scalp taraması sorunsuz tamamlandı.");
+    } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-fullSmcStratejiTara();
-setInterval(fullSmcStratejiTara, 5 * 60 * 1000);
+// Bot tetiklendiğinde hemen tara
+scalpStratejiTara();
+
+// Her 5 dakikada bir taramaya devam et
+setInterval(scalpStratejiTara, 5 * 60 * 1000);
