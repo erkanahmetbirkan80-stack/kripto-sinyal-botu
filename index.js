@@ -68,31 +68,32 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// DOĞRULANMIŞ VE GERÇEK FİYATLI İLK AÇILIŞ TEST SİNYALİ
+// DOĞRULANMIŞ VE KESİN VERİLİ İLK AÇILIŞ TEST SİNYALİ
 async function dogrulanmisTestSinyaliGonder() {
     try {
         const res = await axios.get(`${SPOT_BASE}/ticker/price?symbol=SOLUSDT`);
-        // HATA KESİN OLARAK DÜZELTİLDİ: .price eklendi!
-        const anlikFiyat = parseFloat(res.data.price); 
-        const stop = anlikFiyat * 0.9925;
-        const hedef = anlikFiyat * 1.0150;
+        if (res.data && res.data.price) {
+            const anlikFiyat = parseFloat(res.data.price); 
+            const stop = anlikFiyat * 0.9925;
+            const hedef = anlikFiyat * 1.0150;
 
-        let mesaj = `🚨 *SCALP BOTU GERÇEK FİYATLI TESTİ* 🚨\n` +
-                    `───────────────────\n` +
-                    `📌 *Coin:* SOLUSDT (Solana)\n` +
-                    `📊 *Yön:* 🟢 LONG (ALIM / FUTURES TEST)\n` +
-                    `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
-                    `───────────────────\n` +
-                    `🎯 *Giriş Fiyatı:* $${anlikFiyat.toFixed(2)}\n` +
-                    `🛑 *Stop Seviyesi:* $${stop.toFixed(2)} (%0.75)\n` +
-                    `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
-                    `───────────────────\n` +
-                    `🔍 *Sistem Durumu:*\n` +
-                    `• Matematiksel Hesaplama: %100 DOĞRU ✅\n` +
-                    `• Gerçek Zamanlı Piyasa Taraması Başlatılıyor... ⚙️`;
+            let mesaj = `🚨 *SCALP BOTU GERÇEK FİYATLI TESTİ* 🚨\n` +
+                        `───────────────────\n` +
+                        `📌 *Coin:* SOLUSDT (Solana)\n` +
+                        `📊 *Yön:* 🟢 LONG (ALIM / FUTURES TEST)\n` +
+                        `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
+                        `───────────────────\n` +
+                        `🎯 *Giriş Fiyatı:* $${anlikFiyat.toFixed(2)}\n` +
+                        `🛑 *Stop Seviyesi:* $${stop.toFixed(2)} (%0.75)\n` +
+                        `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
+                        `───────────────────\n` +
+                        `🔍 *Sistem Durumu:*\n` +
+                        `• Matematiksel Hesaplama: %100 DOĞRU ✅\n` +
+                        `• Gerçek Zamanlı Piyasa Taraması Başlatılıyor... ⚙️`;
 
-        await bot.sendMessage(CHAT_ID, mesaj);
-        console.log("Gerçek fiyatlı test sinyali başarıyla fırlatıldı.");
+            await bot.sendMessage(CHAT_ID, mesaj);
+            console.log("Gerçek fiyatlı test sinyali başarıyla fırlatıldı.");
+        }
     } catch (error) { console.error("Test hatası:", error.message); }
 }
 
@@ -104,14 +105,14 @@ async function scalpStratejiTara() {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // KESİN DÜZELTME: Mum dizisindeki 4. indeks (Kapanış fiyatı) milimetrik doğru okutuluyor
-            const mumlar = res.data.map(m => ({
-                open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4])
-            }));
+            // KESİN DÜZELTME: Binance klines alt dizisindeki 4. indeks (Kapanış fiyatı) doğrudan sayı dizisine mapleniyor
+            const kapanislar = res.data.map(m => parseFloat(m[4])); 
+            
+            const sonIdx = kapanislar.length - 1;
+            const anlikFiyat = kapanislar[sonIdx];
 
-            const kapanislar = mumlar.map(m => m.close);
-            const sonIdx = mumlar.length - 1;
-            const anlikFiyat = mumlar[sonIdx].close;
+            // Eğer fiyat bir sayı değilse bu döngüyü es geç (Güvenlik kilidi)
+            if (isNaN(anlikFiyat)) continue;
 
             const rsiDegeri = hesaplaRSI(kapanislar, 14);
             const ema20Degeri = hesaplaEMA(kapanislar, 20);
@@ -147,7 +148,6 @@ async function scalpStratejiTara() {
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-// Bot tetiklendiğinde önce doğrulanmış fiyatlı testi fırlat, 10 saniye sonra da kalıcı taramayı başlat
 async function anaDongu() {
     await dogrulanmisTestSinyaliGonder();
     setTimeout(scalpStratejiTara, 10000);
