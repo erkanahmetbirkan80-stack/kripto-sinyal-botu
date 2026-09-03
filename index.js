@@ -69,10 +69,13 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// TELEGRAM'DAN GELEN EMİRLERİ DİNLEME VE ANLIK ANALİZ MOTORU
+// 🔥 KESİN DÜZELTME: match[1] kullanılarak sadece kullanıcının yazdığı saf kelime filtreye alındı!
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
-    let gelenCoin = match[1].toUpperCase().trim(); // DÜZELTİLDİ: match dizisinden veri doğru indeksle alındı
+    
+    if (!match || !match[1]) return;
+    
+    let gelenCoin = match[1].toUpperCase().trim(); 
     
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
@@ -81,7 +84,6 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `🤖 *Finora Engine:* ${gelenCoin} için canlı borsa verileri indiriliyor, teknik yapay zeka analizi başlatıldı...`).catch(() => null);
 
     try {
-        // DÜZELTİLDİ: URL yapısı ve parametre ayrıştırması hatasız hale getirildi
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`;
         const res = await axios.get(url).catch(() => null);
         
@@ -89,8 +91,7 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi. Lütfen ismi doğru yazdığınızdan emin olun (Örn: BTC veya SOL).`);
         }
 
-        // DÜZELTİLDİ: Mum alt dizisindeki 4. indeks (Kapanış) doğru veri tipiyle ayrıştırıldı
-        const kapanislar = res.data.map(m => parseFloat(m[4])); 
+        const kapanislar = res.data.map(m => parseFloat(m[4])); // DÜZELTİLDİ: Kline dizisindeki 4. indeks (Kapanış fiyatı) milimetrik çekildi
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
 
@@ -134,7 +135,7 @@ async function scalpStratejiTara() {
     try {
         const symbols = await getTopSymbols();
         for (const symbol of symbols) {
-            await uykuModu(500); // Hız sınırı koruması
+            await uykuModu(500); 
 
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
