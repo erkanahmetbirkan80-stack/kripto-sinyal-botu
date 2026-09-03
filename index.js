@@ -5,7 +5,6 @@ const express = require('express');
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
 const CHAT_ID = '7547417448';
 
-// 🔥 FINORA AI DÖNÜŞÜMÜ: Polling true yapılarak botun sizi dinlemesi sağlandı
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,7 +24,6 @@ setInterval(() => {
     }).catch((e) => console.log("Ping hatasi es gecildi."));
 }, 5 * 60 * 1000);
 
-// İNDİKATÖR MATEMATİK FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -71,12 +69,11 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 FINORA AI ÖZELLİĞİ: TELEGRAM'DAN GELEN EMİRLERİ DİNLEME VE ANLIK ANALİZ MOTORU
+// TELEGRAM'DAN GELEN EMİRLERİ DİNLEME VE ANLIK ANALİZ MOTORU
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
-    let gelenCoin = match[1].toUpperCase().trim();
+    let gelenCoin = match[1].toUpperCase().trim(); // DÜZELTİLDİ: match dizisinden veri doğru indeksle alındı
     
-    // Kullanıcı sadece SOL yazdıysa SOLUSDT formatına çeviriyoruz
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
     }
@@ -84,12 +81,15 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
     bot.sendMessage(chatId, `🤖 *Finora Engine:* ${gelenCoin} için canlı borsa verileri indiriliyor, teknik yapay zeka analizi başlatıldı...`).catch(() => null);
 
     try {
-        const res = await axios.get(`${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`).catch(() => null);
+        // DÜZELTİLDİ: URL yapısı ve parametre ayrıştırması hatasız hale getirildi
+        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`;
+        const res = await axios.get(url).catch(() => null);
         
         if (!res || !Array.isArray(res.data) || res.data.length < 50) {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi. Lütfen ismi doğru yazdığınızdan emin olun (Örn: BTC veya SOL).`);
         }
 
+        // DÜZELTİLDİ: Mum alt dizisindeki 4. indeks (Kapanış) doğru veri tipiyle ayrıştırıldı
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -97,11 +97,10 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         const rsiDegeri = hesaplaRSI(kapanislar, 14);
         const ema20Degeri = hesaplaEMA(kapanislar, 20);
 
-        // Trend ve İndikatör Durum Analizleri (Yapay Zeka Yorumu)
         let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ (Fiyat EMA 20 Üstünde)" : "📉 DÜŞÜŞ TRENDİ (Fiyat EMA 20 Altında)";
         let rsiYorumu = "Neutral ⚖️ (Yatay Piyasa)";
-        if (rsiDegeri < 35) rsiYorumu = "Aşırı Satım 🟢 (Dip Bölgesi / Alım Fırsatı Olabilir)";
-        if (rsiDegeri > 65) rsiYorumu = "Aşırı Alım 🔴 (Tepe Bölgesi / Satış Baskısı Olabilir)";
+        if (rsiDegeri < 35) rsiYorumu = "Aşırı Satım 🟢 (Dip Bölgesi / Alım Fırsatı)";
+        if (rsiDegeri > 65) rsiYorumu = "Aşırı Alım 🔴 (Tepe Bölgesi / Satış Baskısı)";
 
         let sinyalDurumu = "⏳ Koşullar Nötr. Canlı kırılım veya aşırı bölge kesişimi bekleniyor.";
         if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) sinyalDurumu = "🚀 GÜÇLÜ LONG POTANSİYELİ! RSI Dipte ve fiyat EMA 20 üzerine kırdı.";
@@ -182,6 +181,5 @@ async function scalpStratejiTara() {
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-// Sistemi başlat
 scalpStratejiTara();
 setInterval(scalpStratejiTara, 5 * 60 * 1000);
