@@ -5,25 +5,27 @@ const express = require('express');
 const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
 const CHAT_ID = '7547417448';
 
-const bot = new TelegramBot(TOKEN, { polling: false });
+// 🔥 FINORA AI DÖNÜŞÜMÜ: Polling true yapılarak botun sizi dinlemesi sağlandı
+const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.status(200).send('Scalp Sinyal Motoru Canli ve Aktif.');
+    res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
 });
 
-// UYANIK TUTMA MOTORU
+// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
     }).catch((e) => console.log("Ping hatasi es gecildi."));
 }, 5 * 60 * 1000);
 
+// İNDİKATÖR MATEMATİK FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -53,8 +55,6 @@ function hesaplaRSI(kapanislar, periyot = 14) {
 }
 
 const SPOT_BASE = 'https://binance.com'; 
-
-// 🔥 Binance'in bizi engellemesini önleyecek küçük mola (bekleme) fonksiyonu
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getTopSymbols() {
@@ -71,19 +71,76 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
+// 🔥 FINORA AI ÖZELLİĞİ: TELEGRAM'DAN GELEN EMİRLERİ DİNLEME VE ANLIK ANALİZ MOTORU
+bot.onText(/\/analiz (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    let gelenCoin = match[1].toUpperCase().trim();
+    
+    // Kullanıcı sadece SOL yazdıysa SOLUSDT formatına çeviriyoruz
+    if (!gelenCoin.endsWith('USDT')) {
+        gelenCoin = gelenCoin + 'USDT';
+    }
+
+    bot.sendMessage(chatId, `🤖 *Finora Engine:* ${gelenCoin} için canlı borsa verileri indiriliyor, teknik yapay zeka analizi başlatıldı...`).catch(() => null);
+
+    try {
+        const res = await axios.get(`${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`).catch(() => null);
+        
+        if (!res || !Array.isArray(res.data) || res.data.length < 50) {
+            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi. Lütfen ismi doğru yazdığınızdan emin olun (Örn: BTC veya SOL).`);
+        }
+
+        const kapanislar = res.data.map(m => parseFloat(m[4])); 
+        const sonIdx = kapanislar.length - 1;
+        const anlikFiyat = kapanislar[sonIdx];
+
+        const rsiDegeri = hesaplaRSI(kapanislar, 14);
+        const ema20Degeri = hesaplaEMA(kapanislar, 20);
+
+        // Trend ve İndikatör Durum Analizleri (Yapay Zeka Yorumu)
+        let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ (Fiyat EMA 20 Üstünde)" : "📉 DÜŞÜŞ TRENDİ (Fiyat EMA 20 Altında)";
+        let rsiYorumu = "Neutral ⚖️ (Yatay Piyasa)";
+        if (rsiDegeri < 35) rsiYorumu = "Aşırı Satım 🟢 (Dip Bölgesi / Alım Fırsatı Olabilir)";
+        if (rsiDegeri > 65) rsiYorumu = "Aşırı Alım 🔴 (Tepe Bölgesi / Satış Baskısı Olabilir)";
+
+        let sinyalDurumu = "⏳ Koşullar Nötr. Canlı kırılım veya aşırı bölge kesişimi bekleniyor.";
+        if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) sinyalDurumu = "🚀 GÜÇLÜ LONG POTANSİYELİ! RSI Dipte ve fiyat EMA 20 üzerine kırdı.";
+        if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) sinyalDurumu = "⚠️ GÜÇLÜ SHORT POTANSİYELİ! RSI Tepede ve fiyat EMA 20 altına kırdı.";
+
+        let raporMesaji = `🤖 *FINORA AI ÖZEL TEKNİK RAPORU* 🤖\n` +
+                          `───────────────────\n` +
+                          `📌 *Varlık:* ${gelenCoin}\n` +
+                          `⏱️ *Zaman Dilimi:* 5 Dakika (Scalp)\n` +
+                          `💰 *Anlık Canlı Fiyat:* $${anlikFiyat}\n` +
+                          `───────────────────\n` +
+                          `📊 *Trend Algoritması:* \n` +
+                          `${trendDurumu}\n\n` +
+                          `🔍 *İndikatör Analizleri:* \n` +
+                          `• RSI (14): ${rsiDegeri.toFixed(2)} -> ${rsiYorumu}\n` +
+                          `• EMA (20): $${ema20Degeri.toFixed(5)}\n` +
+                          `───────────────────\n` +
+                          `🎯 *Yapay Zeka Sinyal Özeti:* \n` +
+                          `${sinyalDurumu}`;
+
+        bot.sendMessage(chatId, raporMesaji).catch(() => null);
+
+    } catch (error) {
+        bot.sendMessage(chatId, `❌ Analiz motorunda anlık bir hata oluştu: ${error.message}`).catch(() => null);
+    }
+});
+
+// ARKA PLANDA SESSİZ ÇALIŞAN 7/24 OTOMATİK TARAMA MOTORU
 async function scalpStratejiTara() {
-    console.log("Binance piyasası hız sınırı korumalı olarak taranıyor...");
+    console.log("Binance piyasası arka planda otomatik taranıyor...");
     try {
         const symbols = await getTopSymbols();
-        
         for (const symbol of symbols) {
-            // 🔥 KESİN ÇÖZÜM: Her coin isteğinden önce 500 milisaniye (yarım saniye) bekler. Binance bizi asla engelleyemez.
-            await uykuModu(500); 
+            await uykuModu(500); // Hız sınırı koruması
 
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            const kapanislar = res.data.map(m => parseFloat(m)); 
+            const kapanislar = res.data.map(m => parseFloat(m[4])); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
 
@@ -108,9 +165,9 @@ async function scalpStratejiTara() {
                             `───────────────────\n` +
                             `📌 *Coin:* ${symbol}\n` +
                             `📊 *Yön:* ${yon}\n` +
-                            `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
+                            `⏱️ *Varlık Dilimi:* 5 Dakika\n` +
                             `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* ${anlikFiyat.toFixed(5)}\n` +
+                            `🎯 *Giriş Fiyatı:* ${anlikFiyat}\n` +
                             `🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n` +
                             `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
                             `───────────────────\n` +
@@ -121,11 +178,10 @@ async function scalpStratejiTara() {
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
-        console.log("Scalp taraması sorunsuz tamamlandı. Kilitlenme önlendi.");
+        console.log("Arka plan scalp taraması tamamlandı.");
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-// Sohbet kirliliği yaratan o 5 dakikalık boş bildirim satırı tamamen kaldırıldı. 
-// Bot artık sadece gerçek sinyal üretirse Telegram'a mesaj atacak.
+// Sistemi başlat
 scalpStratejiTara();
 setInterval(scalpStratejiTara, 5 * 60 * 1000);
