@@ -4,29 +4,27 @@ const express = require('express');
 
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
-const RENDER_URL = 'https://onrender.com'; // Sizin Render URL'niz
+const RENDER_URL = 'https://onrender.com'; 
 
-// 🛠️ KESİN ÇÖZÜM: polling kapatıldı, Webhook moduna geçildi!
 const bot = new TelegramBot(TOKEN, { polling: false });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Telegram'dan gelen mesajları yakalayan Webhook endpoint'i
+// Telegram Webhook Mesaj Yakalayıcı
 app.post(`/bot${TOKEN}`, (req, res) => {
     bot.processUpdate(req.body);
     res.sendStatus(200);
 });
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli (Webhook Modu).');
+    res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
     try {
-        // Render her açıldığında Telegram'a "Bana gelen mesajları bu linke gönder" talimatı veriyoruz
         await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
         console.log("⚡ Telegram Webhook başarıyla bağlandı! Çakışma hatası kalıcı olarak çözüldü.");
     } catch (e) {
@@ -34,7 +32,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
 });
 
-// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
+// UYUMAYI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
     axios.get(RENDER_URL).then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -86,15 +84,17 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🎯 CANLI ANALİZ KOMUT MOTORU (DÜZELTİLDİ)
-bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
+// 🔥 KESİN DÜZELTME: Webhook modunda kayıpsız çalışan garantili kelime yakalama mimarisi
+bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     
     if (!match || !match[1]) {
-        return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
+        return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL`").catch(() => null);
     }
     
+    // match[1] dizideki saf parametreyi hatasız çeker
     let gelenCoin = match[1].toUpperCase().trim(); 
+    
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
     }
@@ -143,7 +143,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
         bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı. Sembolün Binance'de listeli olduğundan emin olun.`).catch(() => null);
     }
 });
 
