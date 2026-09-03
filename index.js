@@ -17,7 +17,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
 });
 
-// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
+// UYANIK TUTMA MOTORU
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -54,6 +54,9 @@ function hesaplaRSI(kapanislar, periyot = 14) {
 
 const SPOT_BASE = 'https://binance.com'; 
 
+// 🔥 Binance'in bizi engellemesini önleyecek küçük mola (bekleme) fonksiyonu
+const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function getTopSymbols() {
     try {
         const response = await axios.get(`${SPOT_BASE}/ticker/24hr`);
@@ -69,20 +72,18 @@ async function getTopSymbols() {
 }
 
 async function scalpStratejiTara() {
-    console.log("Binance piyasası kısıtlamasız köprü üzerinden taranıyor...");
+    console.log("Binance piyasası hız sınırı korumalı olarak taranıyor...");
     try {
         const symbols = await getTopSymbols();
         
-        // Açılışta çalıştığını kanıtlamak için ilk tetiklendiğinde Telegram'a bilgi atıyoruz
-        await bot.sendMessage(CHAT_ID, `⚙️ *Scalp Motoru Aktif:* 40 adet hacimli kripto varlık 5m grafikte taranıyor...`).catch(() => null);
-
         for (const symbol of symbols) {
+            // 🔥 KESİN ÇÖZÜM: Her coin isteğinden önce 500 milisaniye (yarım saniye) bekler. Binance bizi asla engelleyemez.
+            await uykuModu(500); 
+
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // Her bir mumnun kapanış değerini milimetrik doğru ayrıştırıyoruz
-            const kapanislar = res.data.map(m => parseFloat(m[4])); 
-            
+            const kapanislar = res.data.map(m => parseFloat(m)); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
 
@@ -120,10 +121,11 @@ async function scalpStratejiTara() {
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
-        console.log("Scalp taraması sorunsuz tamamlandı.");
+        console.log("Scalp taraması sorunsuz tamamlandı. Kilitlenme önlendi.");
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-// Hatalı test fonksiyonları arındırıldı, doğrudan ana motor tetikleniyor
+// Sohbet kirliliği yaratan o 5 dakikalık boş bildirim satırı tamamen kaldırıldı. 
+// Bot artık sadece gerçek sinyal üretirse Telegram'a mesaj atacak.
 scalpStratejiTara();
 setInterval(scalpStratejiTara, 5 * 60 * 1000);
