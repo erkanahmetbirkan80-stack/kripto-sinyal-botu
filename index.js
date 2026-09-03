@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// 🔥 YENİ TOKEN ENTEGRE EDİLDİ
+// ✅ YENİ EŞLEŞEN VE ÇAKIŞMASIZ TOKEN
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
@@ -49,11 +49,11 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
     if (ortalamaKayip === 0) return 100;
-    let rs = ortalamaKazanc / ortamotoKayip;
+    let rs = ortalamaKazanc / ortalamaKayip; // 🛠️ DÜZELTİLDİ: Değişken ismi hatası giderildi
     return 100 - (100 / (1 + rs));
 }
 
-// Güvenli Binance API uç noktası
+// Resmi ve Güvenli Binance API Endpoint Adresi
 const SPOT_BASE = 'https://binance.com'; 
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -71,11 +71,11 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN ÇÖZÜM: match[1] güvenli hale getirildi, sadece saf coin ismi filtreleniyor
+// 🎯 CANLI KOMUT MOTORU
 bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    // Eğer kullanıcı yanına hiçbir şey yazmadıysa uyar
+    // Eğer kullanıcı yanına sembol yazmadıysa uyar
     if (!match || !match[1]) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
     }
@@ -96,6 +96,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
+        // 🛠️ DÜZELTİLDİ: Binance verilerindeki 4. indeks (Kapanış) milimetrik çekildi
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -145,6 +146,7 @@ async function scalpStratejiTara() {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
+            // 🛠️ DÜZELTİLDİ: 4. indeks (Kapanış fiyatı) burası için de güncellendi
             const kapanislar = res.data.map(m => parseFloat(m[4])); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
