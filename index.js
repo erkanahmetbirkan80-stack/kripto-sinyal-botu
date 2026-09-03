@@ -18,9 +18,9 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🤖 Kendi Kendini Uyandıran Ultra SMC Botu Aktif!\n\nSunucu uykusunu engellemek için ping motoru devreye alındı. 15m mumlar taranıyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🚀 SMC Botu Sık Sinyal Moduna Alındı!\n\nZaman dilimi 5m olarak güncellendi. Piyasa daha agresif taranıyor...`).catch(e => console.log(e.message));
 
-// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU (Kendi URL'niz eklendi)
+// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -37,7 +37,7 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
-// DÜZELTİLDİ: Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken doğru bağlantı
+// Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken doğru bağlantı
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
@@ -56,17 +56,16 @@ async function getFuturesSymbols() {
 }
 
 async function fullSmcStratejiTara() {
-    console.log("Binance Futures piyasası SMC kurallarına göre taranıyor...");
+    console.log("Binance Futures piyasası 5m grafikte agresif taranıyor...");
     try {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
-            // DÜZELTİLDİ: Mum verilerini çeken Binance Vadeli İşlemler Klines endpointi yazıldı
-            const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=210`);
+            // DEĞİŞİKLİK: interval=15m yerine interval=5m yapıldı (Daha sık sinyal için)
+            const res = await axios.get(`https://binance.com{symbol}&interval=5m&limit=210`);
             
             if (!Array.isArray(res.data)) continue;
 
-            // DÜZELTİLDİ: Binance dizisindeki Açılış, Yüksek, Düşük ve Kapanış indeksleri doğru eşlendi
             const mumlar = res.data.map(m => ({
                 open: parseFloat(m[1]), 
                 high: parseFloat(m[2]), 
@@ -129,14 +128,15 @@ async function fullSmcStratejiTara() {
                 }
             }
 
-            if (yon && sinyalMaddeleri.length >= 2 && hedef > 0 && stop > 0) {
+            // DEĞİŞİKLİK: Sinyal kriteri >= 2 yerine >= 1 yapıldı (Tek kural eşleşse bile anında sinyal atacak)
+            if (yon && sinyalMaddeleri.length >= 1 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
-                let mesaj = `⚡ YENİ KRİPTO SİNYALİ ⚡\n` +
+                let mesaj = `⚡ YENİ AGRESİF SİNYAL ⚡\n` +
                             `───────────────────\n` +
                             `📌 Coin: ${symbol}\n` +
                             `📊 Yön: ${yon}\n` +
-                            `⏱️ Zaman Dilimi: 15 Dakika\n` +
+                            `⏱️ Zaman Dilimi: 5 Dakika\n` +
                             `───────────────────\n` +
                             `🎯 Giriş: ${anlikFiyat}\n` +
                             `🛑 Stop: ${stop} (%${stopYuzdesi})\n` +
@@ -149,12 +149,12 @@ async function fullSmcStratejiTara() {
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
-        console.log("Tarama tamamlandi. Sorun yok.");
+        console.log("5m taraması tamamlandı. Sinyaller kontrol edildi.");
     } catch (error) { console.error("SMC Tarama hatası:", error.message); }
 }
 
-// Bot ilk açıldığında hemen bir kere tarasın
+// İlk açılışta hemen tara
 fullSmcStratejiTara();
 
-// Her 15 dakikada bir taramaya devam et
-setInterval(fullSmcStratejiTara, 15 * 60 * 1000);
+// DEĞİŞİKLİK: 15 dakikada bir değil, artık her 5 dakikada bir piyasayı baştan aşağı tarar
+setInterval(fullSmcStratejiTara, 5 * 60 * 1000);
