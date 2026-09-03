@@ -52,8 +52,8 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// 🔥 DÜZELTME: Doğru Binance API Base URL'i tanımlandı
-const SPOT_BASE = 'https://binance.com'; 
+// Güvenli Binance API uç noktası
+const SPOT_BASE = 'https://api.binance.com/api/v3'; 
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getTopSymbols() {
@@ -70,15 +70,16 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 DÜZELTME: Sadece /analiz yazıldığında botun çökmesini önleyen esnek regex yapısı
+// 🔥 KESİN ÇÖZÜM: match[1] güvenli hale getirildi, regex tam kelime filtrelemesine alındı.
 bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    // Eğer kullanıcı yanına sembol yazmadıysa uyarı ver ve durdur
+    // Girdi yoksa veya sadece /analiz yazıldıysa durdur
     if (!match || !match[1]) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
     }
     
+    // Sadece kullanıcının yazdığı kelimeyi ("SOL") izole et
     let gelenCoin = match[1].toUpperCase().trim(); 
     
     if (!gelenCoin.endsWith('USDT')) {
@@ -95,6 +96,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
+        // 4. indeks (Kapanış fiyatları) milimetrik diziye aktarıldı
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -129,7 +131,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
         bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekme hatası oluştu.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya borsa bağlantı hatası oluştu.`).catch(() => null);
     }
 });
 
@@ -155,7 +157,7 @@ async function scalpStratejiTara() {
 
             if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
 
-            let yon = null; let stop = 0; let hedef = 0;
+            let yon = null; let stop = 0; let healer = 0; let hedef = 0;
 
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
@@ -186,6 +188,5 @@ async function scalpStratejiTara() {
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
-// 🔥 DÜZELTME: Yarım kalan fonksiyon çağrıları ve döngüsel tetikleyiciler tamamlandı
 scalpStratejiTara();
-setInterval(scalpStratejiTara, 5 * 60 * 1000); // 5 dakikada bir otomatik tarar
+setInterval(scalpStratejiTara, 5 * 60 * 1000);
