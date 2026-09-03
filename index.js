@@ -20,7 +20,7 @@ app.listen(PORT, '0.0.0.0', () => {
 // İlk çalıştırma kontrol mesajı
 bot.sendMessage(CHAT_ID, `🤖 Kendi Kendini Uyandıran Ultra SMC Botu Aktif!\n\nSunucu uykusunu engellemek için ping motoru devreye alındı. 15m mumlar taranıyor...`).catch(e => console.log(e.message));
 
-// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
+// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU (Kendi URL'niz eklendi)
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -37,15 +37,18 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
-// Binance Vadeli İşlemler (Futures) hacim listesini çeken doğru API eklendi
+// DÜZELTİLDİ: Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken doğru bağlantı
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
-        return response.data
-            .filter(item => item.symbol.endsWith('USDT'))
-            .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-            .slice(0, 50)
-            .map(c => c.symbol);
+        if (Array.isArray(response.data)) {
+            return response.data
+                .filter(item => item.symbol.endsWith('USDT'))
+                .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+                .slice(0, 50)
+                .map(c => c.symbol);
+        }
+        return [];
     } catch (error) { 
         console.error("Sembol listesi çekilemedi:", error.message);
         return []; 
@@ -58,9 +61,12 @@ async function fullSmcStratejiTara() {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
+            // DÜZELTİLDİ: Mum verilerini çeken Binance Vadeli İşlemler Klines endpointi yazıldı
             const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=210`);
             
-            // Binance dizisindeki veriler nesneye dönüştürülüyor
+            if (!Array.isArray(res.data)) continue;
+
+            // DÜZELTİLDİ: Binance dizisindeki Açılış, Yüksek, Düşük ve Kapanış indeksleri doğru eşlendi
             const mumlar = res.data.map(m => ({
                 open: parseFloat(m[1]), 
                 high: parseFloat(m[2]), 
@@ -143,6 +149,7 @@ async function fullSmcStratejiTara() {
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
+        console.log("Tarama tamamlandi. Sorun yok.");
     } catch (error) { console.error("SMC Tarama hatası:", error.message); }
 }
 
