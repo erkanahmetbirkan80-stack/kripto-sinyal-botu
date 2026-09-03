@@ -18,7 +18,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🚀 SMC Botu Sık Sinyal Moduna Alındı!\n\nZaman dilimi 5m olarak güncellendi. Piyasa daha agresif taranıyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🚀 SMC Botu Ultra Agresif Modda Aktif!\n\nMum limitleri optimize edildi. Sinyaller bekleniyor...`).catch(e => console.log(e.message));
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
@@ -37,7 +37,6 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
-// Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken doğru bağlantı
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
@@ -56,15 +55,14 @@ async function getFuturesSymbols() {
 }
 
 async function fullSmcStratejiTara() {
-    console.log("Binance Futures piyasası 5m grafikte agresif taranıyor...");
+    console.log("Binance Futures piyasası 5m grafikte milimetrik taranıyor...");
     try {
         const symbols = await getFuturesSymbols();
         
         for (const symbol of symbols) {
-            // DEĞİŞİKLİK: interval=15m yerine interval=5m yapıldı (Daha sık sinyal için)
-            const res = await axios.get(`https://binance.com{symbol}&interval=5m&limit=210`);
+            const res = await axios.get(`https://binance.com{symbol}&interval=5m&limit=100`);
             
-            if (!Array.isArray(res.data)) continue;
+            if (!Array.isArray(res.data) || res.data.length < 60) continue; // DÜZELTİLDİ: Sınırı 200'den 60 muma düşürdük.
 
             const mumlar = res.data.map(m => ({
                 open: parseFloat(m[1]), 
@@ -72,8 +70,6 @@ async function fullSmcStratejiTara() {
                 low: parseFloat(m[3]), 
                 close: parseFloat(m[4])
             }));
-
-            if (mumlar.length < 200) continue;
 
             const son = mumlar.length - 1;
             const anlikFiyat = mumlar[son].close;
@@ -102,37 +98,33 @@ async function fullSmcStratejiTara() {
 
             let yon = null; let stop = 0; let hedef = 0; let sinyalMaddeleri = [];
 
+            // KRİTER ESNETİLDİ: Tek bir formasyon bile sinyal için yeterli
             if (bearishOB || bearishFVG || bosBear) {
                 yon = "🔴 SHORT"; stop = mumlar[son - 2].high;
                 const riskMesafesi = stop - anlikFiyat;
                 if (riskMesafesi > 0) {
-                    hedef = anlikFiyat - (riskMesafesi * 2.05);
+                    hedef = anlikFiyat - (riskMesafesi * 1.5); // Risk ödül oranını daha kolay gerçekleşmesi için 1.5R yaptık
                     if (ema50Altinda) sinyalMaddeleri.push("- Fiyat EMA50 altında");
                     if (bosBear) sinyalMaddeleri.push("- BOS_BEAR");
                     if (bearishFVG) sinyalMaddeleri.push("- Bearish FVG");
-                    if (bearishBreaker) sinyalMaddeleri.push("- Bearish Breaker Block");
                     if (bearishOB) sinyalMaddeleri.push("- Bearish Order Block");
-                    if (bearishMitigation) sinyalMaddeleri.push("- Bearish Mitigation Block");
                 }
             } else if (bullishOB || bullishFVG || bosBull) {
                 yon = "🟢 LONG"; stop = mumlar[son - 2].low;
                 const riskMesafesi = anlikFiyat - stop;
                 if (riskMesafesi > 0) {
-                    hedef = anlikFiyat + (riskMesafesi * 2.05);
+                    hedef = anlikFiyat + (riskMesafesi * 1.5);
                     if (ema50Ustunde) sinyalMaddeleri.push("- Fiyat EMA50 üstünde");
                     if (bosBull) sinyalMaddeleri.push("- BOS_BULL");
                     if (bullishFVG) sinyalMaddeleri.push("- Bullish FVG");
-                    if (bullishBreaker) sinyalMaddeleri.push("- Bullish Breaker Block");
                     if (bullishOB) sinyalMaddeleri.push("- Bullish Order Block");
-                    if (bullishMitigation) sinyalMaddeleri.push("- Bullish Mitigation Block");
                 }
             }
 
-            // DEĞİŞİKLİK: Sinyal kriteri >= 2 yerine >= 1 yapıldı (Tek kural eşleşse bile anında sinyal atacak)
             if (yon && sinyalMaddeleri.length >= 1 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
-                let mesaj = `⚡ YENİ AGRESİF SİNYAL ⚡\n` +
+                let mesaj = `⚡ YENİ SİNYAL ⚡\n` +
                             `───────────────────\n` +
                             `📌 Coin: ${symbol}\n` +
                             `📊 Yön: ${yon}\n` +
@@ -141,7 +133,6 @@ async function fullSmcStratejiTara() {
                             `🎯 Giriş: ${anlikFiyat}\n` +
                             `🛑 Stop: ${stop} (%${stopYuzdesi})\n` +
                             `💰 Hedef: ${hedef}\n` +
-                            `📐 Risk/Reward: 2.05R\n` +
                             `───────────────────\n` +
                             `🔍 Sinyaller:\n` +
                             sinyalMaddeleri.join('\n');
@@ -149,12 +140,9 @@ async function fullSmcStratejiTara() {
                 bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
             }
         }
-        console.log("5m taraması tamamlandı. Sinyaller kontrol edildi.");
+        console.log("5m milimetrik taraması tamamlandı. Sorun yok.");
     } catch (error) { console.error("SMC Tarama hatası:", error.message); }
 }
 
-// İlk açılışta hemen tara
 fullSmcStratejiTara();
-
-// DEĞİŞİKLİK: 15 dakikada bir değil, artık her 5 dakikada bir piyasayı baştan aşağı tarar
 setInterval(fullSmcStratejiTara, 5 * 60 * 1000);
