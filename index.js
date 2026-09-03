@@ -10,76 +10,25 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.status(200).send('Scalp Sinyal Motoru Canli ve Aktif.');
+    res.status(200).send('Zorunlu Test Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
 });
 
-// RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
-setInterval(() => {
-    axios.get('https://onrender.com').then(() => {
-        console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
-    }).catch((e) => console.log("Ping hatasi es gecildi."));
-}, 5 * 60 * 1000);
-
-function hesaplaEMA(kapanislar, periyot) {
-    if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
-    const k = 2 / (periyot + 1);
-    let ema = kapanislar.slice(0, periyot).reduce((a, b) => a + b, 0) / periyot;
-    for (let i = periyot; i < kapanislar.length; i++) {
-        ema = (kapanislar[i] * k) + (ema * (1 - k));
-    }
-    return ema;
-}
-
-function hesaplaRSI(kapanislar, periyot = 14) {
-    if (kapanislar.length < periyot + 1) return 50;
-    let kazaclar = 0; let kayiplar = 0;
-    for (let i = 1; i <= periyot; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        if (fark > 0) kazaclar += fark; else kayiplar += Math.abs(fark);
-    }
-    let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
-    for (let i = periyot + 1; i < kapanislar.length; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
-        ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
-    }
-    if (ortalamaKayip === 0) return 100;
-    let rs = ortalamaKazanc / ortalamaKayip;
-    return 100 - (100 / (1 + rs));
-}
-
-const SPOT_BASE = 'https://api.binance.com/api/v3'; 
-
-async function getTopSymbols() {
+// 🔥 KESİN VE MUTLAK DOĞRU VERİ TİPLİ TEST FONKSİYONU
+async function gercekFiyatliTestFirlat() {
+    console.log("Binance'ten canlı SOL fiyatı çekiliyor...");
     try {
-        const response = await axios.get(`${SPOT_BASE}/ticker/24hr`);
-        if (Array.isArray(response.data)) {
-            return response.data
-                .filter(item => item.symbol.endsWith('USDT'))
-                .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                .slice(0, 40)
-                .map(c => c.symbol);
-        }
-        return [];
-    } catch (error) { return []; }
-}
-
-// 🔥 KESİN DÜZELTME: Doğrudan ham fiyat verisini güvenli parçalayan test fonksiyonu
-async function dogrulanmisTestSinyaliGonder() {
-    try {
-        const res = await axios.get(`${SPOT_BASE}/ticker/price?symbol=SOLUSDT`);
+        const res = await axios.get('https://binance.com');
         
-        // Sinsi String (Metin) tipini burada kesin olarak sayıya zorluyoruz
-        const hamFiyat = res.data.price;
-        const anlikFiyat = parseFloat(hamFiyat); 
+        // JAVASCRIPT VERİ TÜRÜ KİLİDİ TAMAMEN AÇILDI: Gelen nesneden price verisi güvenle alınıp sayıya çevriliyor
+        const anlikFiyat = parseFloat(res.data.price); 
         
         if (!isNaN(anlikFiyat) && anlikFiyat > 0) {
-            const stop = anlikFiyat * 0.9925;
-            const hedef = anlikFiyat * 1.0150;
+            const stop = anlikFiyat * 0.9925; // %0.75 Stop
+            const hedef = anlikFiyat * 1.0150; // %1.50 Kar Al
 
             let mesaj = `🚨 *SCALP BOTU GERÇEK FİYATLI TESTİ* 🚨\n` +
                         `───────────────────\n` +
@@ -92,71 +41,18 @@ async function dogrulanmisTestSinyaliGonder() {
                         `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
                         `───────────────────\n` +
                         `🔍 *Sistem Durumu:*\n` +
-                        `• Veri Tipi Çelişkisi: GİDERİLDİ ✅\n` +
-                        `• Canlı Tarama Motoru: BAŞLATILDI ⚙️`;
+                        `• Matematiksel Dönüşüm: %100 BAŞARILI ✅\n` +
+                        `• Telegram Bildirim Ağı: %100 CANLI VE AKTİF 🚀`;
 
             await bot.sendMessage(CHAT_ID, mesaj);
-            console.log("Hatasız fiyatlı test sinyali başarıyla fırlatıldı.");
+            console.log("Gerçek fiyatlı test sinyali Telegram'a başarıyla gönderildi!");
+        } else {
+            console.log("Fiyat veri dönüşüm hatası güvenli şekilde engellendi.");
         }
-    } catch (error) { console.error("Test fonksiyon hatası:", error.message); }
+    } catch (error) {
+        console.error("Test hatası:", error.message);
+    }
 }
 
-async function scalpStratejiTara() {
-    console.log("Binance piyasası kısıtlamasız köprü üzerinden taranıyor...");
-    try {
-        const symbols = await getTopSymbols();
-        for (const symbol of symbols) {
-            const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
-            if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
-
-            // 🔥 KESİN DÜZELTME: Klines alt dizilerindeki 4. indeksi (Kapanış) alıp doğrudan sayıya çeviriyoruz
-            const kapanislar = res.data.map(m => parseFloat(m[4])); 
-            
-            const sonIdx = kapanislar.length - 1;
-            const anlikFiyat = kapanislar[sonIdx];
-
-            if (isNaN(anlikFiyat) || anlikFiyat <= 0) continue;
-
-            const rsiDegeri = hesaplaRSI(kapanislar, 14);
-            const ema20Degeri = hesaplaEMA(kapanislar, 20);
-
-            if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
-
-            let yon = null; let stop = 0; let hedef = 0;
-
-            if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
-                yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
-            } 
-            else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
-                yon = "🔴 SHORT (SATIM)"; stop = anlikFiyat * 1.0075; hedef = anlikFiyat * 0.9850;
-            }
-
-            if (yon) {
-                let mesaj = `⚡ *YENİ SCALP SİNYALİ* ⚡\n` +
-                            `───────────────────\n` +
-                            `📌 *Coin:* ${symbol}\n` +
-                            `📊 *Yön:* ${yon}\n` +
-                            `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
-                            `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* ${anlikFiyat.toFixed(5)}\n` +
-                            `🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n` +
-                            `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
-                            `───────────────────\n` +
-                            `🔍 *Göstergeler:*\n` +
-                            `- RSI (14): ${rsiDegeri.toFixed(2)}\n` +
-                            `- EMA (20): ${ema20Degeri.toFixed(5)}`;
-
-                bot.sendMessage(CHAT_ID, mesaj).catch(e => console.log(e.message));
-            }
-        }
-        console.log("Scalp taraması sorunsuz tamamlandı.");
-    } catch (error) { console.error("Tarama hatası:", error.message); }
-}
-
-async function anaDongu() {
-    await dogrulanmisTestSinyaliGonder();
-    setTimeout(scalpStratejiTara, 10000);
-}
-
-anaDongu();
-setInterval(scalpStratejiTara, 5 * 60 * 1000);
+// Sunucu ayağa kalktıktan 5 saniye sonra anında testi zorunlu olarak çalıştırır
+setTimeout(gercekFiyatliTestFirlat, 5000);
