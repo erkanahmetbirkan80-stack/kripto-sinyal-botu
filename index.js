@@ -21,7 +21,6 @@ app.listen(PORT, '0.0.0.0', () => {
 bot.sendMessage(CHAT_ID, `🤖 Kendi Kendini Uyandıran Ultra SMC Botu Aktif!\n\nSunucu uykusunu engellemek için ping motoru devreye alındı. 15m mumlar taranıyor...`).catch(e => console.log(e.message));
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
-// Her 5 dakikada bir kendi web adresine istek atarak sunucuyu 7/24 uyanık tutar
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -38,6 +37,7 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
+// Binance Vadeli İşlemler (Futures) hacim listesini çeken doğru API eklendi
 async function getFuturesSymbols() {
     try {
         const response = await axios.get('https://binance.com');
@@ -46,7 +46,10 @@ async function getFuturesSymbols() {
             .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
             .slice(0, 50)
             .map(c => c.symbol);
-    } catch (error) { return []; }
+    } catch (error) { 
+        console.error("Sembol listesi çekilemedi:", error.message);
+        return []; 
+    }
 }
 
 async function fullSmcStratejiTara() {
@@ -56,8 +59,13 @@ async function fullSmcStratejiTara() {
         
         for (const symbol of symbols) {
             const res = await axios.get(`https://binance.com{symbol}&interval=15m&limit=210`);
+            
+            // Binance dizisindeki veriler nesneye dönüştürülüyor
             const mumlar = res.data.map(m => ({
-                open: parseFloat(m), high: parseFloat(m), low: parseFloat(m), close: parseFloat(m)
+                open: parseFloat(m[1]), 
+                high: parseFloat(m[2]), 
+                low: parseFloat(m[3]), 
+                close: parseFloat(m[4])
             }));
 
             if (mumlar.length < 200) continue;
@@ -115,7 +123,6 @@ async function fullSmcStratejiTara() {
                 }
             }
 
-            // Sinyal hassasiyetini kurumsal kaliteyi bozmadan 2 kurala indirdik (Sık sinyal için)
             if (yon && sinyalMaddeleri.length >= 2 && hedef > 0 && stop > 0) {
                 const stopYuzdesi = ((Math.abs(anlikFiyat - stop) / anlikFiyat) * 100).toFixed(2);
                 
@@ -125,9 +132,9 @@ async function fullSmcStratejiTara() {
                             `📊 Yön: ${yon}\n` +
                             `⏱️ Zaman Dilimi: 15 Dakika\n` +
                             `───────────────────\n` +
-                            `🎯 Giriş: ${anlikFiyat.toFixed(5)}\n` +
-                            `🛑 Stop: ${stop.toFixed(5)} (%${stopYuzdesi})\n` +
-                            `💰 Hedef: ${hedef.toFixed(5)}\n` +
+                            `🎯 Giriş: ${anlikFiyat}\n` +
+                            `🛑 Stop: ${stop} (%${stopYuzdesi})\n` +
+                            `💰 Hedef: ${hedef}\n` +
                             `📐 Risk/Reward: 2.05R\n` +
                             `───────────────────\n` +
                             `🔍 Sinyaller:\n` +
@@ -139,4 +146,8 @@ async function fullSmcStratejiTara() {
     } catch (error) { console.error("SMC Tarama hatası:", error.message); }
 }
 
+// Bot ilk açıldığında hemen bir kere tarasın
+fullSmcStratejiTara();
+
+// Her 15 dakikada bir taramaya devam et
 setInterval(fullSmcStratejiTara, 15 * 60 * 1000);
