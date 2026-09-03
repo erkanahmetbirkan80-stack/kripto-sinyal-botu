@@ -2,7 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-const TOKEN = '8974920211:AAG8xJ4CaUtdmmSeqV0McSqtLhBpv9VZQPg';
+// 🔥 YENİ TOKEN ENTEGRE EDİLDİ
+const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -48,12 +49,12 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
     if (ortalamaKayip === 0) return 100;
-    let rs = ortalamaKazanc / ortalamaKayip;
+    let rs = ortalamaKazanc / ortamotoKayip;
     return 100 - (100 / (1 + rs));
 }
 
 // Güvenli Binance API uç noktası
-const SPOT_BASE = 'https://api.binance.com/api/v3'; 
+const SPOT_BASE = 'https://binance.com'; 
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getTopSymbols() {
@@ -70,16 +71,15 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN ÇÖZÜM: match[1] güvenli hale getirildi, regex tam kelime filtrelemesine alındı.
+// 🔥 KESİN ÇÖZÜM: match[1] güvenli hale getirildi, sadece saf coin ismi filtreleniyor
 bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    // Girdi yoksa veya sadece /analiz yazıldıysa durdur
+    // Eğer kullanıcı yanına hiçbir şey yazmadıysa uyar
     if (!match || !match[1]) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
     }
     
-    // Sadece kullanıcının yazdığı kelimeyi ("SOL") izole et
     let gelenCoin = match[1].toUpperCase().trim(); 
     
     if (!gelenCoin.endsWith('USDT')) {
@@ -96,7 +96,6 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
-        // 4. indeks (Kapanış fiyatları) milimetrik diziye aktarıldı
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -131,7 +130,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
         bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya borsa bağlantı hatası oluştu.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı. Sembolün doğruluğundan emin olun.`).catch(() => null);
     }
 });
 
@@ -157,7 +156,7 @@ async function scalpStratejiTara() {
 
             if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
 
-            let yon = null; let stop = 0; let healer = 0; let hedef = 0;
+            let yon = null; let stop = 0; let hedef = 0;
 
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
