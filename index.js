@@ -18,7 +18,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🚀 *Kripto Scalp Sinyal Botu Canlandı!*\n\nRSI ve EMA 20 Göstergeleri Aktif. 5m grafikte 50 coin kesintisiz taranıyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🚀 *SMC & Scalp Botu %100 Veri Modunda Aktif!*\n\nİndeks hataları giderildi. İlk tarama başlıyor...`).catch(e => console.log(e.message));
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
@@ -92,11 +92,11 @@ async function scalpStratejiTara() {
             
             if (!Array.isArray(res.data) || res.data.length < 50) continue;
 
-            const kapanislar = res.data.map(m => parseFloat(m[4])); // HATASIZ İNDEKS: Kapanış fiyatları doğru indekslendi
+            // KESİN DÜZELTME: Binance mum dizisindeki 4. indeks (Kapanış fiyatı) doğru ayrıştırıldı
+            const kapanislar = res.data.map(m => parseFloat(m[4])); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
 
-            // BOŞLUK HATALARI DÜZELTİLDİ: Değişken isimleri birleştirildi
             const rsiDegeri = hesaplaRSI(kapanislar, 14);
             const ema20Degeri = hesaplaEMA(kapanislar, 20);
 
@@ -107,14 +107,14 @@ async function scalpStratejiTara() {
             // 🟢 LONG KOŞULU: RSI aşırı satımdaysa (< 35) ve fiyat EMA 20'nin üzerindeyse
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)";
-                stop = anlikFiyat * 0.9925; // %0.75 Stop mesafesi
-                hedef = anlikFiyat * 1.0150; // %1.50 Kar Al mesafesi
+                stop = anlikFiyat * 0.9925; // %0.75 Stop
+                hedef = anlikFiyat * 1.0150; // %1.50 Kar Al
             } 
             // 🔴 SHORT KOŞULU: RSI aşırı alımdaysa (> 65) ve fiyat EMA 20'nin altındaysa
             else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
                 yon = "🔴 SHORT (SATIM)";
-                stop = anlikFiyat * 1.0075; // %0.75 Stop mesafesi
-                hedef = anlikFiyat * 0.9850; // %1.50 Kar Al mesafesi
+                stop = anlikFiyat * 1.0075; // %0.75 Stop
+                hedef = anlikFiyat * 0.9850; // %1.50 Kar Al
             }
 
             if (yon) {
