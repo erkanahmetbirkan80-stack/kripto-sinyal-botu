@@ -2,25 +2,41 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ Yeni token ve doğru sohbet kimliği aktif
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
+const RENDER_URL = 'https://onrender.com'; // Sizin Render URL'niz
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+// 🛠️ KESİN ÇÖZÜM: polling kapatıldı, Webhook moduna geçildi!
+const bot = new TelegramBot(TOKEN, { polling: false });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
-    res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli.');
+app.use(express.json());
+
+// Telegram'dan gelen mesajları yakalayan Webhook endpoint'i
+app.post(`/bot${TOKEN}`, (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.get('/', (req, res) => {
+    res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli (Webhook Modu).');
+});
+
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
+    try {
+        // Render her açıldığında Telegram'a "Bana gelen mesajları bu linke gönder" talimatı veriyoruz
+        await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
+        console.log("⚡ Telegram Webhook başarıyla bağlandı! Çakışma hatası kalıcı olarak çözüldü.");
+    } catch (e) {
+        console.log("Webhook kurulum hatası:", e.message);
+    }
 });
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
-    axios.get('https://onrender.com').then(() => {
+    axios.get(RENDER_URL).then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
     }).catch((e) => console.log("Ping hatasi es gecildi."));
 }, 5 * 60 * 1000);
@@ -53,7 +69,6 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// Resmi ve Güvenli Binance API Endpoint Adresi
 const SPOT_BASE = 'https://binance.com'; 
 const uykuModu = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -71,18 +86,15 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN ÇÖZÜM: match[1] kullanılarak sadece kullanıcının yazdığı saf kelime filtreye alındı!
+// 🎯 CANLI ANALİZ KOMUT MOTORU (DÜZELTİLDİ)
 bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    // Eğer kullanıcı yanına hiçbir şey yazmadıysa uyarı ver ve işlemi durdur
     if (!match || !match[1]) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL` veya `/analiz BTC`").catch(() => null);
     }
     
-    // match[1] ile dizinin içindeki saf coin ismini alıyoruz (Örn: "SOL")
     let gelenCoin = match[1].toUpperCase().trim(); 
-    
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
     }
@@ -97,7 +109,6 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
-        // Binance mum verilerinde 4. indeks kapanış fiyatıdır.
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -132,18 +143,16 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
         bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı. Sembolün doğruluğundan emin olun.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı.`).catch(() => null);
     }
 });
 
 // ARKA PLANDA SESSİZ ÇALIŞAN 7/24 OTOMATİK TARAMA MOTORU
 async function scalpStratejiTara() {
-    console.log("Binance piyasası arka planda otomatik taranıyor...");
     try {
         const symbols = await getTopSymbols();
         for (const symbol of symbols) {
             await uykuModu(500); 
-
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
@@ -159,33 +168,17 @@ async function scalpStratejiTara() {
             if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
 
             let yon = null; let stop = 0; let hedef = 0;
-
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
-            } 
-            else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
+            } else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
                 yon = "🔴 SHORT (SATIM)"; stop = anlikFiyat * 1.0075; hedef = anlikFiyat * 0.9850;
             }
 
             if (yon) {
-                let mesaj = `⚡ *YENİ SCALP SİNYALİ* ⚡\n` +
-                            `───────────────────\n` +
-                            `📌 *Coin:* ${symbol}\n` +
-                            `📊 *Yön:* ${yon}\n` +
-                            `⏱️ *Varlık Dilimi:* 5 Dakika\n` +
-                            `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* ${anlikFiyat}\n` +
-                            `🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n` +
-                            `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
-                            `───────────────────\n` +
-                            `🔍 *Göstergeler:*\n` +
-                            `- RSI (14): ${rsiDegeri.toFixed(2)}\n` +
-                            `- EMA (20): ${ema20Degeri.toFixed(5)}`;
-
-                bot.sendMessage(CHAT_ID, mesaj, { parse_mode: 'Markdown' }).catch(e => console.log(e.message));
+                let mesaj = `⚡ *YENİ SCALP SİNYALİ* ⚡\n───────────────────\n📌 *Coin:* ${symbol}\n📊 *Yön:* ${yon}\n⏱️ *Varlık Dilimi:* 5 Dakika\n───────────────────\n🎯 *Giriş Fiyatı:* ${anlikFiyat}\n🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n───────────────────\n🔍 *Göstergeler:*\n- RSI (14): ${rsiDegeri.toFixed(2)}\n- EMA (20): ${ema20Degeri.toFixed(5)}`;
+                bot.sendMessage(CHAT_ID, mesaj, { parse_mode: 'Markdown' }).catch(() => null);
             }
         }
-        console.log("Arka plan scalp taraması tamamlandı.");
     } catch (error) { console.error("Tarama hatası:", error.message); }
 }
 
