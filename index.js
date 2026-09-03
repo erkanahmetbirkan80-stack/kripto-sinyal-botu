@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.status(200).send('Scalp Sinyal Motoru Canli.');
+    res.status(200).send('Scalp Sinyal Motoru Canli ve Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', () => {
@@ -52,7 +52,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-const SPOT_BASE = 'https://binance.com'; 
+const SPOT_BASE = 'https://api.binance.com/api/v3'; 
 
 async function getTopSymbols() {
     try {
@@ -68,36 +68,35 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN ÇÖZÜM: Veri tipi tamamen güvenceye alınmış test sinyali fonksiyonu
+// 🔥 KESİN DÜZELTME: Doğrudan ham fiyat verisini güvenli parçalayan test fonksiyonu
 async function dogrulanmisTestSinyaliGonder() {
     try {
         const res = await axios.get(`${SPOT_BASE}/ticker/price?symbol=SOLUSDT`);
         
-        // Verinin doğruluğu kontrol ediliyor
-        if (res.data && res.data.price) {
-            const anlikFiyat = Number(res.data.price); // parseFloat yerine daha katı olan Number kullanıldı
-            
-            if (!isNaN(anlikFiyat) && anlikFiyat > 0) {
-                const stop = anlikFiyat * 0.9925;
-                const hedef = anlikFiyat * 1.0150;
+        // Sinsi String (Metin) tipini burada kesin olarak sayıya zorluyoruz
+        const hamFiyat = res.data.price;
+        const anlikFiyat = parseFloat(hamFiyat); 
+        
+        if (!isNaN(anlikFiyat) && anlikFiyat > 0) {
+            const stop = anlikFiyat * 0.9925;
+            const hedef = anlikFiyat * 1.0150;
 
-                let mesaj = `🚨 *SCALP BOTU GERÇEK FİYATLI TESTİ* 🚨\n` +
-                            `───────────────────\n` +
-                            `📌 *Coin:* SOLUSDT (Solana)\n` +
-                            `📊 *Yön:* 🟢 LONG (ALIM / FUTURES TEST)\n` +
-                            `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
-                            `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* $${anlikFiyat.toFixed(2)}\n` +
-                            `🛑 *Stop Seviyesi:* $${stop.toFixed(2)} (%0.75)\n` +
-                            `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
-                            `───────────────────\n` +
-                            `🔍 *Sistem Durumu:*\n` +
-                            `• Veri Ayrıştırma Türü: %100 DOĞRU ✅\n` +
-                            `• Gerçek Canlı Tarama: BAŞLATILDI ⚙️`;
+            let mesaj = `🚨 *SCALP BOTU GERÇEK FİYATLI TESTİ* 🚨\n` +
+                        `───────────────────\n` +
+                        `📌 *Coin:* SOLUSDT (Solana)\n` +
+                        `📊 *Yön:* 🟢 LONG (ALIM / FUTURES TEST)\n` +
+                        `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
+                        `───────────────────\n` +
+                        `🎯 *Giriş Fiyatı:* $${anlikFiyat.toFixed(2)}\n` +
+                        `🛑 *Stop Seviyesi:* $${stop.toFixed(2)} (%0.75)\n` +
+                        `💰 *Kâr Hedefi:* $${hedef.toFixed(2)} (%1.50)\n` +
+                        `───────────────────\n` +
+                        `🔍 *Sistem Durumu:*\n` +
+                        `• Veri Tipi Çelişkisi: GİDERİLDİ ✅\n` +
+                        `• Canlı Tarama Motoru: BAŞLATILDI ⚙️`;
 
-                await bot.sendMessage(CHAT_ID, mesaj);
-                console.log("Doğru fiyatlı test sinyali Telegram'a başarıyla fırlatıldı.");
-            }
+            await bot.sendMessage(CHAT_ID, mesaj);
+            console.log("Hatasız fiyatlı test sinyali başarıyla fırlatıldı.");
         }
     } catch (error) { console.error("Test fonksiyon hatası:", error.message); }
 }
@@ -110,10 +109,8 @@ async function scalpStratejiTara() {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // KESİN DÜZELTME: Her bir mum satırındaki (alt dizi) 4. indeksteki kapanış fiyatı doğru çekiliyor
-            const kapanislar = res.data.map(m => Number(m[4])); 
-            
-            if (kapanislar.length < 14) continue;
+            // 🔥 KESİN DÜZELTME: Klines alt dizilerindeki 4. indeksi (Kapanış) alıp doğrudan sayıya çeviriyoruz
+            const kapanislar = res.data.map(m => parseFloat(m[4])); 
             
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
@@ -141,7 +138,7 @@ async function scalpStratejiTara() {
                             `📊 *Yön:* ${yon}\n` +
                             `⏱️ *Zaman Dilimi:* 5 Dakika\n` +
                             `───────────────────\n` +
-                            `🎯 *Giriş Fiyatı:* ${anlikFiyat}\n` +
+                            `🎯 *Giriş Fiyatı:* ${anlikFiyat.toFixed(5)}\n` +
                             `🛑 *Stop Seviyesi:* ${stop.toFixed(5)}\n` +
                             `💰 *Kâr Hedefi:* ${hedef.toFixed(5)}\n` +
                             `───────────────────\n` +
