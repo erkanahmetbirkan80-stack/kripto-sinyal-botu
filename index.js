@@ -18,7 +18,7 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // İlk çalıştırma kontrol mesajı
-bot.sendMessage(CHAT_ID, `🚀 *SMC & Scalp Botu %100 Veri Modunda Aktif!*\n\nİndeks hataları giderildi. İlk tarama başlıyor...`).catch(e => console.log(e.message));
+bot.sendMessage(CHAT_ID, `🚀 *Scalp Botu Gerçek Veri Modunda Aktif!*\n\nMum indeksleri milimetrik düzeltildi. 5m taraması baştan başlıyor...`).catch(e => console.log(e.message));
 
 // RENDER'IN UYUMASINI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
@@ -67,7 +67,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
 // Binance Futures API'sinden en yüksek hacimli ilk 50 coini çeken bağlantı
 async function getFuturesSymbols() {
     try {
-        const response = await axios.get('https://binance.com');
+        const response = await axios.get('https://fapi.binance.com/fapi/v1/ticker/24hr');
         if (Array.isArray(response.data)) {
             return response.data
                 .filter(item => item.symbol.endsWith('USDT'))
@@ -92,10 +92,17 @@ async function scalpStratejiTara() {
             
             if (!Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // KESİN DÜZELTME: Binance mum dizisindeki 4. indeks (Kapanış fiyatı) doğru ayrıştırıldı
-            const kapanislar = res.data.map(m => parseFloat(m[4])); 
-            const sonIdx = kapanislar.length - 1;
-            const anlikFiyat = kapanislar[sonIdx];
+            // 🔥 KESİN DÜZELTME: Binance mum dizisindeki Açılış[1], Yüksek[2], Düşük[3], Kapanış[4] indeksleri eklendi!
+            const mumlar = res.data.map(m => ({
+                open: parseFloat(m[1]), 
+                high: parseFloat(m[2]), 
+                low: parseFloat(m[3]), 
+                close: parseFloat(m[4])
+            }));
+
+            const kapanislar = mumlar.map(m => m.close);
+            const sonIdx = mumlar.length - 1;
+            const anlikFiyat = mumlar[sonIdx].close;
 
             const rsiDegeri = hesaplaRSI(kapanislar, 14);
             const ema20Degeri = hesaplaEMA(kapanislar, 20);
