@@ -84,7 +84,7 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🔥 KESİN DÜZELTME: Webhook modunda kayıpsız çalışan garantili kelime yakalama mimarisi
+// 🎯 CANLI ANALİZ KOMUT MOTORU
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     
@@ -92,7 +92,6 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL`").catch(() => null);
     }
     
-    // match[1] dizideki saf parametreyi hatasız çeker
     let gelenCoin = match[1].toUpperCase().trim(); 
     
     if (!gelenCoin.endsWith('USDT')) {
@@ -109,6 +108,7 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
+        // 🔥 KRİTİK DÜZELTME: Binance mum dizisindeki 4. indeks (Kapanış fiyatı) çekildi
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
@@ -156,6 +156,7 @@ async function scalpStratejiTara() {
             const res = await axios.get(`${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
+            // 🔥 KRİTİK DÜZELTME: Tarayıcı motoru için de 4. indeks düzeltildi
             const kapanislar = res.data.map(m => parseFloat(m[4])); 
             const sonIdx = kapanislar.length - 1;
             const anlikFiyat = kapanislar[sonIdx];
