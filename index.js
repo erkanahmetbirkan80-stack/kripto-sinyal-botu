@@ -13,19 +13,18 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: Gelen parametreleri hatasız ayrıştırır
+// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: Parametre dizilimleri %100 düzeltildi
 app.post(`/bot${TOKEN}`, (req, res) => {
-    res.sendStatus(200); // Telegram'a yanıtı anında teslim eterek tıkanmayı önle
+    res.sendStatus(200); // Telegram sunucusunu bekletmeden anında 200 OK dön
     
     if (req.body && req.body.message && req.body.message.text) {
         const text = req.body.message.text.trim();
         const chatId = req.body.message.chat.id;
 
         if (text.startsWith('/analiz')) {
-            // Mesajı boşluklara göre güvenli bir şekilde parçala
-            const parcalar = text.split(/\s+/); 
+            const parcalar = text.split(/\s+/); // Boşluklara göre ayır
             
-            // Parametre indeksleri kaymasın diye doğrusal kontrol
+            // Örnek: "/analiz SOL 15m" -> parcalar[1] = "SOL", parcalar[2] = "15m"
             const coinParam = parcalar[1] ? parcalar[1].toUpperCase().trim() : '';
             const vadeParam = parcalar[2] ? parcalar[2].toLowerCase().trim() : '1s';
             
@@ -39,7 +38,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu 3000 portunda aktif.`);
+    console.log(`Sunucu aktif.`);
     try {
         await bot.deleteWebHook();
         await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
@@ -47,7 +46,6 @@ app.listen(PORT, '0.0.0.0', async () => {
     } catch (e) { console.log("Webhook Hatasi:", e.message); }
 });
 
-// Sunucu uyku moduna geçmesin diye ping motoru
 setInterval(() => { axios.get(RENDER_URL).catch(() => null); }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
@@ -102,14 +100,15 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
     bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için ${vadeParam.toUpperCase()} canlı borsa verileri analiz ediliyor...`).catch(() => null);
 
     try {
-        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=interval&limit=100`;
+        // 🛠️ DÜZELTİLDİ: interval parametresi dinamik hale getirildi
+        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=${interval}&limit=100`;
         const res = await axios.get(url);
         
         if (!res || !Array.isArray(res.data) || res.data.length < 40) {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
         }
 
-        // ✅ BİNANCE MATRİS OKUYUCU DÜZELTİLDİ: Kapanış, en yüksek ve en düşük fiyatlar tam indekslerinden çekildi
+        // 🛠️ DÜZELTİLDİ: İç diziler, [2], [3] indekslerine göre milimetrik çekiliyor
         const kapanislar = res.data.map(m => parseFloat(m[4]));
         const enYuksekler = res.data.map(m => parseFloat(m[2]));
         const enDusukler = res.data.map(m => parseFloat(m[3]));
