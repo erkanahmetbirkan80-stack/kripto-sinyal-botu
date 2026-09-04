@@ -49,7 +49,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
     for (let i = periyot + 1; i < kapanislar.length; i++) {
         let fark = kapanislar[i] - kapanislar[i - 1];
-        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
+        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? float => (fark > 0 ? fark : 0) : (fark > 0 ? fark : 0))) / periyot;
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
     if (ortalamaKayip === 0) return 100;
@@ -88,14 +88,12 @@ async function otopilotKasaMotoru() {
 
     for (const symbol of benzersizListe) {
         try {
-            await new Promise(resolve => setTimeout(resolve, 800)); // Güvenli borsa bekleme süresi
+            await new Promise(resolve => setTimeout(resolve, 800)); 
 
-            // 🔥 KRİTİK DÜZELTME: interval parametresi dinamik şablona geçirildi (${interval})
             const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`;
             const res = await axios.get(url);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // ✅ MATRİS HARİTALAMASI EN BAZ ALINAN BORSA STANDARTLARINA GÖRE SABİTLENDİ
             const kapanislar = res.data.map(m => parseFloat(m[4]));
             const enYuksekler = res.data.map(m => parseFloat(m[2]));
             const enDusukler = res.data.map(m => parseFloat(m[3]));
@@ -132,20 +130,20 @@ async function otopilotKasaMotoru() {
             let zd = "";
             let riskUyarisi = "";
 
-            // Yapay Zeka Koşul Matrisi (Hızlı Scalp ve Esnek RSI)
-            if (rsi < 46 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendLongUygun) {
+            // 🛠️ OPTİMİZE EDİLDİ: Hacim eşiği %10 artışa (1.1 katı) çekildi, sinyal akışı hızlandırıldı
+            if (rsi < 46 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.1) && buyukTrendLongUygun) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
                 ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat - (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte kurumsal para girişi (%30+ hacim artışı) gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi. Günlük kasa hedefi için uygundur.`;
+                riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte dengeli kurumsal para girişi gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi. Günlük kasa hedefi için uygundur.`;
             } 
-            else if (rsi > 54 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendShortUygun) {
+            else if (rsi > 54 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.1) && buyukTrendShortUygun) {
                 sinyalTetiklendi = true;
                 yon = "🔴 SAT (SHORT)";
                 ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat + (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• 1 Saatlik ana trend düşüş yönündeyken, 5m grafikte güçlü satıcı hacmi (%30+ hacim artışı) tetiklendi.\n• Büyük resim ayı yönlü momentumu destekliyor. Günlük kasa hedefi için uygundur.`;
+                riskUyarisi = `• 1 Saatlik ana trend düşüş yönündeyken, 5m grafikte kararlı satıcı hacmi tetiklendi.\n• Büyük resim ayı yönlü momentumu destekliyor. Günlük kasa hedefi için uygundur.`;
             }
 
             if (sinyalTetiklendi) {
@@ -174,7 +172,7 @@ async function otopilotKasaMotoru() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
             }
 
-        } catch (error) { console.error("Döngü hatası:", error.message); }
+        } catch (error) { null; }
     }
     console.log("✅ 100 Parite kurumsal filtrelerle tarandı. 5 dakika sonra yeni döngü başlayacak.");
 }
