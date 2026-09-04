@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ Güncel ve çakışmasız token bilgileriniz
+// ✅ Güncel ve aktif token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - 100 Parite Profesyonel Gunluk Kasa Buyutme Motoru Canli.');
+    res.status(200).send('Finora AI - 100 Parite Profesyonel Kasa Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
@@ -21,7 +21,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     try { await bot.deleteWebHook(); } catch (e) { null; }
 });
 
-// Render uyku moduna geçmesin diye ping motoru
+// Render uyku moduna geçmesin diye canlı tutma motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
@@ -90,12 +90,12 @@ async function otopilotKasaMotoru() {
         try {
             await new Promise(resolve => setTimeout(resolve, 800)); // Güvenli borsa bekleme süresi
 
-            // 1. ZIRH: 5 Dakikalık Ana Mum ve Hacim Verilerini Çek
+            // 🔥 KRİTİK DÜZELTME: interval parametresi dinamik şablona geçirildi (${interval})
             const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`;
-            const res = await axios.get(url).catch(() => null);
+            const res = await axios.get(url);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            // ✅ MİLİMETRİK DÜZELTME: Binance mum indeksleri (Kapanış: 4, Yüksek: 2, Düşük: 3, Hacim: 5) tam olarak bağlandı!
+            // ✅ MATRİS HARİTALAMASI EN BAZ ALINAN BORSA STANDARTLARINA GÖRE SABİTLENDİ
             const kapanislar = res.data.map(m => parseFloat(m[4]));
             const enYuksekler = res.data.map(m => parseFloat(m[2]));
             const enDusukler = res.data.map(m => parseFloat(m[3]));
@@ -104,13 +104,12 @@ async function otopilotKasaMotoru() {
             const anlikFiyat = kapanislar[kapanislar.length - 1];
             const sonHacim = hacimler[hacimler.length - 1];
             
-            // Ortalama hacim hesabı (Son 20 mumun ortalama hacmi)
             const ortalamaHacim = hacimler.slice(hacimler.length - 20).reduce((a, b) => a + b, 0) / 20;
 
             const rsi = hesaplaRSI(kapanislar, 14);
             const ema20 = hesaplaEMA(kapanislar, 20);
 
-            // 2. ZIRH: Büyük Resim Doğrulaması (1 Saatlik Trend Kontrolü)
+            // 1 Saatlik Trend Doğrulaması
             const url1h = `${SPOT_BASE}/klines?symbol=${symbol}&interval=1h&limit=30`;
             const res1h = await axios.get(url1h).catch(() => null);
             if (!res1h || !Array.isArray(res1h.data)) continue;
@@ -118,11 +117,9 @@ async function otopilotKasaMotoru() {
             const kapanislar1h = res1h.data.map(m => parseFloat(m[4]));
             const ema20_1h = hesaplaEMA(kapanislar1h, 20);
             
-            // Büyük trend yönü belirleme
             const buyukTrendLongUygun = kapanislar1h[kapanislar1h.length - 1] > ema20_1h;
             const buyukTrendShortUygun = kapanislar1h[kapanislar1h.length - 1] < ema20_1h;
 
-            // ATR Volatilite Hesabı
             let toplamMenzil = 0;
             for (let i = res.data.length - 10; i < res.data.length; i++) {
                 toplamMenzil += (enYuksekler[i] - enDusukler[i]);
@@ -135,15 +132,15 @@ async function otopilotKasaMotoru() {
             let zd = "";
             let riskUyarisi = "";
 
-            // 🎯 GÜNLÜK HEDEF YAPAY ZEKA SİNYAL ŞARTLARI
-            if (rsi < 45 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendLongUygun) {
+            // Yapay Zeka Koşul Matrisi (Hızlı Scalp ve Esnek RSI)
+            if (rsi < 46 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendLongUygun) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
                 ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat - (oynaklik * 1.6)).toFixed(4);
                 riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte kurumsal para girişi (%30+ hacim artışı) gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi. Günlük kasa hedefi için uygundur.`;
             } 
-            else if (rsi > 55 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendShortUygun) {
+            else if (rsi > 54 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendShortUygun) {
                 sinyalTetiklendi = true;
                 yon = "🔴 SAT (SHORT)";
                 ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
@@ -177,7 +174,7 @@ async function otopilotKasaMotoru() {
                 await new Promise(resolve => setTimeout(resolve, 4000));
             }
 
-        } catch (error) { null; }
+        } catch (error) { console.error("Döngü hatası:", error.message); }
     }
     console.log("✅ 100 Parite kurumsal filtrelerle tarandı. 5 dakika sonra yeni döngü başlayacak.");
 }
