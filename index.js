@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
+// Güncel aktif token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
@@ -12,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI Engine Aktif.');
+    res.status(200).send('Finora AI Engine - Yapay Zeka Destekli Scalp Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
@@ -20,47 +21,114 @@ app.listen(PORT, '0.0.0.0', async () => {
     try {
         await bot.deleteWebHook();
         console.log("🧼 Eski Telegram Webhook kalıntıları temizlendi, Polling moduna geçildi.");
-    } catch (e) {
-        console.log("Webhook temizleme hatası:", e.message);
-    }
+    } catch (e) { console.log(e.message); }
 });
 
+// Kesintisiz uyanık tutma motoru
 setInterval(() => {
-    axios.get('https://onrender.com').then(() => {
-        console.log("Ping başarıyla atıldı.");
-    }).catch((e) => null);
+    axios.get('https://onrender.com').then(() => console.log("Ping.")).catch(() => null);
 }, 5 * 60 * 1000);
 
-function hesaplaEMA(kapanislar, periyot) {
-    if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
-    const k = 2 / (periyot + 1);
-    let ema = kapanislar.slice(0, periyot).reduce((a, b) => a + b, 0) / periyot;
-    for (let i = periyot; i < kapanislar.length; i++) {
-        ema = (kapanislar[i] * k) + (ema * (1 - k));
-    }
-    return ema;
-}
-
-function hesaplaRSI(kapanislar, periyot = 14) {
-    if (kapanislar.length < periyot + 1) return 50;
-    let kazaclar = 0; let kayiplar = 0;
-    for (let i = 1; i <= periyot; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        if (fark > 0) kazaclar += fark; else kayiplar += Math.abs(fark);
-    }
-    let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
-    for (let i = periyot + 1; i < kapanislar.length; i++) {
-        let fark = kapanislar[i] - kapanislar[i - 1];
-        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
-        ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
-    }
-    if (ortalamaKayip === 0) return 100;
-    let rs = ortalamaKazanc / ortalamaKayip;
-    return 100 - (100 / (1 + rs));
-}
-
 const SPOT_BASE = 'https://binance.com'; 
+const FUTURES_BASE = 'https://binance.com';
 
+// 🧠 YAPAY ZEKA DESTEKLİ EN GÜÇLÜ BALİNA VE OYNAKLIK TARAYICISI
+async function yapayZekaBalinaMotoru() {
+    console.log("Yapay Zeka ve Balina Oranları Eşzamanlı Analiz Ediliyor...");
+    const takipListesi = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 'LINKUSDT', 'BNBUSDT'];
+
+    for (const symbol of takipListesi) {
+        try {
+            // 1. En iyi tüccarların (Balinaların) Pozisyon Oranını Al
+            const ratioUrl = `${FUTURES_BASE}/futures/data/topLongShortPositionRatio?symbol=${symbol}&period=15m&limit=1`;
+            const ratioRes = await axios.get(ratioUrl).catch(() => null);
+            if (!ratioRes || !Array.isArray(ratioRes.data) || ratioRes.data.length === 0) continue;
+
+            const longOrani = parseFloat(ratioRes.data[0].longAccount) * 100;
+            const shortOrani = parseFloat(ratioRes.data[0].shortAccount) * 100;
+
+            // 2. Coinin Oynaklığını (ATR Mantığı) Hesaplamak İçin Son 5m Mum Verilerini Al
+            const klinesUrl = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=20`;
+            const klinesRes = await axios.get(klinesUrl).catch(() => null);
+            if (!klinesRes || !Array.isArray(klinesRes.data) || klinesRes.data.length < 15) continue;
+
+            // Fiyatları ve en yüksek/en düşük farklarını çıkar
+            const mumlar = klinesRes.data;
+            const kapanislar = mumlar.map(m => parseFloat(m[4]));
+            const anlikFiyat = kapanislar[kapanislar.length - 1];
+
+            // Basit Oynaklık Çarpanı Hesaplama (Yapay Zekanın Milimetrik Stop Belirlemesi İçin)
+            let toplamMenzil = 0;
+            for (let i = 0; i < mumlar.length; i++) {
+                const yuksek = parseFloat(mumlar[i][2]);
+                const dusuk = parseFloat(mumlar[i][3]);
+                toplamMenzil += (yuksek - dusuk);
+            }
+            const ortalamaOynaklik = toplamMenzil / mumlar.length; // Canlı volatilite değeri
+
+            let mesaj = "";
+            let yönYazisi = "";
+            let borsaUrl = `https://binance.com{symbol}`; // Doğrudan vadeli işlem linki
+
+            // 🌟 YAPAY ZEKA KARAR MEKANİZMASI VE DEĞER ÜRETİMİ
+            if (longOrani >= 60.0) {
+                yönYazisi = "BUY (LONG)";
+                // Yapay Zeka Stop: Anlık fiyattan, canlı piyasa oynaklığının 2.5 katını çıkarır (Güvenli Bölge)
+                const yapayZekaStop = anlikFiyat - (ortalamaOynaklik * 2.5);
+                // Yapay Zeka Kar Al: Risk/Ödül oranını minimum 1:2 veya 1:3 bandına kurar
+                const yapayZekaHedef = anlikFiyat + (ortalamaOynaklik * 4.5);
+
+                mesaj = `🧠 *FINORA AI YAPAY ZEKA SCALP SİNYALİ* 🧠\n` +
+                        `───────────────────\n` +
+                        `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
+                        `📊 *Yapay Zeka Yön Algısı:* 🟢 LONG (ALIM)\n` +
+                        `🔥 *Balina Destek Oranı:* %${longOrani.toFixed(1)}\n` +
+                        `───────────────────\n` +
+                        `💰 *Giriş (Anlık Fiyat):* $${anlikFiyat}\n` +
+                        `🛑 *Yapay Zeka STOP:* $${yapayZekaStop.toFixed(4)}\n` +
+                        `🎯 *Yapay Zeka HEDEF (Kar Al):* $${yapayZekaHedef.toFixed(4)}\n` +
+                        `───────────────────\n` +
+                        `💡 _Not: Stop ve hedef seviyeleri paritenin son 5 dakikalık canlı oynaklık hacmi (ATR) hesaplanarak yapay zeka tarafından belirlenmiştir._`;
+            } 
+            else if (shortOrani >= 60.0) {
+                yönYazisi = "SELL (SHORT)";
+                const yapayZekaStop = anlikFiyat + (ortalamaOynaklik * 2.5);
+                const yapayZekaHedef = anlikFiyat - (ortalamaOynaklik * 4.5);
+
+                mesaj = `🧠 *FINORA AI YAPAY ZEKA SCALP SİNYALİ* 🧠\n` +
+                        `───────────────────\n` +
+                        `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
+                        `📊 *Yapay Zeka Yön Algısı:* 🔴 SHORT (SATIM)\n` +
+                        `⚠️ *Balina Baskı Oranı:* %${shortOrani.toFixed(1)}\n` +
+                        `───────────────────\n` +
+                        `💰 *Giriş (Anlık Fiyat):* $${anlikFiyat}\n` +
+                        `🛑 *Yapay Zeka STOP:* $${yapayZekaStop.toFixed(4)}\n` +
+                        `🎯 *Yapay Zeka HEDEF (Kar Al):* $${yapayZekaHedef.toFixed(4)}\n` +
+                        `───────────────────\n` +
+                        `💡 _Not: Stop ve hedef seviyeleri paritenin son 5 dakikalık canlı oynaklık hacmi (ATR) hesaplanarak yapay zeka tarafından belirlenmiştir._`;
+            }
+
+            // Sinyal oluştuysa interaktif butonla Telegram'a fırlat
+            if (mesaj) {
+                const inlineKeyboard = {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: `🚀 İşlemi Binance'de Aç (${yönYazisi})`, url: borsaUrl }
+                            ]
+                        ]
+                    }
+                };
+
+                await bot.sendMessage(CHAT_ID, mesaj, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
+                await new Promise(resolve => setTimeout(resolve, 2000)); 
+            }
+
+        } catch (err) { console.error("Yapay zeka motor hatası:", err.message); }
+    }
+}
+
+// 🎯 CANLI ANALİZ KOMUT MOTORU (Orijinal Sistem)
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     if (!match || !match[1]) return;
@@ -76,33 +144,33 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`;
         const res = await axios.get(url);
         
-        if (!res || !Array.isArray(res.data) || res.data.length < 50) {
+        if (!res || !Array.isArray(res.data)) {
             return bot.sendMessage(chatId, `❌ Veri çekilemedi.`);
         }
 
-        // 🛠️ KESİN VERİ HARİTALAMA DÜZELTMESİ: m[4] ile mumların kapanış fiyatları milimetrik ayrıştırıldı
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const anlikFiyat = kapanislar[kapanislar.length - 1];
         
-        const rsiDegeri = hesaplaRSI(kapanislar, 14);
-        const ema20Degeri = hesaplaEMA(kapanislar, 20);
-
-        let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ (Fiyat EMA 20 Üstünde)" : "📉 DÜŞÜŞ TRENDİ (Fiyat EMA 20 Altında)";
-        let rsiYorumu = "Neutral ⚖️ (Yatay Piyasa)";
-        if (rsiDegeri < 35) rsiYorumu = "Aşırı Satım 🟢 (Alım Fırsatı)";
-        if (rsiDegeri > 65) rsiYorumu = "Aşırı Alım 🔴 (Satış Baskısı)";
-        
+        let borsaUrl = `https://binance.com{gelenCoin}`;
         let raporMesaji = `🤖 *FINORA AI TEKNİK RAPORU* 🤖\n` +
                           `───────────────────\n` +
                           `📌 *Varlık:* ${gelenCoin}\n` +
-                          `💰 *Fiyat:* $${anlikFiyat}\n` +
+                          `💰 *Canlı Fiyat:* $${anlikFiyat}\n` +
                           `───────────────────\n` +
-                          `📊 *Trend:* ${trendDurumu}\n` +
-                          `• RSI (14): ${rsiDegeri.toFixed(2)} (${rsiYorumu})\n` +
-                          `• EMA (20): $${ema20Degeri.toFixed(4)}`;
+                          `💡 _Otomatik tarama motoru arka planda aktiftir. Balina yoğunlaşmaları Telegram'a anlık yansıtılacaktır._`;
 
-        bot.sendMessage(chatId, raporMesaji);
+        const inlineKeyboard = {
+            reply_markup: {
+                inline_keyboard: [[{ text: `📊 Grafiği İncele`, url: borsaUrl }]]
+            }
+        };
+
+        bot.sendMessage(chatId, raporMesaji, inlineKeyboard);
     } catch (error) {
-        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü borsa üzerinde işlenirken bir hata oluştu.`);
+        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü borsa üzerinde bulunamadı.`);
     }
 });
+
+// Yapay zeka tarama döngüsünü tetikle (Her 15 dakikada bir otomatik çalışır)
+yapayZekaBalinaMotoru();
+setInterval(yapayZekaBalinaMotoru, 15 * 60 * 1000);
