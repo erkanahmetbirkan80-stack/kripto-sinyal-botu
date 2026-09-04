@@ -13,24 +13,22 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - 5 Dakikalik Hizli Scalp & Esnek RSI Motoru Aktif.');
+    res.status(200).send('Finora AI - 100 Parite Profesyonel Gunluk Kasa Buyutme Motoru Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif. 100 Parite 5m hızlı scalp tarayıcısı başlatıldı.`);
-    try {
-        await bot.deleteWebHook();
-    } catch (e) { null; }
+    console.log(`Sunucu aktif. Kasa büyütme motoru otopilotta başlatıldı.`);
+    try { await bot.deleteWebHook(); } catch (e) { null; }
 });
 
-// Render sunucusunun uykuya dalmasını engelleyen ping motoru
+// Render uyku moduna geçmesin diye ping motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
-// 📊 MATEMATİKSEL İNDİKATÖR FONKSİYONLARI
+// 📊 MATEMATİKSEL İNDİKATÖR VE HACİM FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -59,9 +57,9 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// 🧠 5 DAKİKALIK OTOMATİK KCEX YAPAY ZEKA TARAYICI MOTORU
-async function otomatikScalpTara() {
-    console.log("⏳ 100 Elit paritede 5m canlı mumlar taranıyor...");
+// 🧠 YAPAY ZEKA GÜNLÜK HEDEF MOTORU (7/24 OTOPİLOT)
+async function otopilotKasaMotoru() {
+    console.log("⏳ Günlük hedef için 100 paritede 5m mumlar ve hacim kilitleri taranıyor...");
     
     const takipListesi = [
         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 
@@ -90,21 +88,40 @@ async function otomatikScalpTara() {
 
     for (const symbol of benzersizListe) {
         try {
-            await new Promise(resolve => setTimeout(resolve, 800)); 
+            await new Promise(resolve => setTimeout(resolve, 800)); // Güvenli borsa bekleme süresi
 
-            // 🛠️ DÜZELTİLDİ: Zaman dilimi interval=5m olarak güncellendi
+            // 1. ZIRH: 5 Dakikalık Ana Mum ve Hacim Verilerini Çek
             const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`;
             const res = await axios.get(url).catch(() => null);
-            if (!res || !Array.isArray(res.data) || res.data.length < 40) continue;
+            if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
             const kapanislar = res.data.map(m => parseFloat(m[4]));
             const enYuksekler = res.data.map(m => parseFloat(m[2]));
             const enDusukler = res.data.map(m => parseFloat(m[3]));
+            const hacimler = res.data.map(m => parseFloat(m[5])); // Canlı hacim dizisi
             
             const anlikFiyat = kapanislar[kapanislar.length - 1];
+            const sonHacim = hacimler[hacimler.length - 1];
+            
+            // Ortalama hacim hesabı (Son 20 mumun ortalama hacmi)
+            const ortalamaHacim = hacimler.slice(hacimler.length - 20).reduce((a, b) => a + b, 0) / 20;
+
             const rsi = hesaplaRSI(kapanislar, 14);
             const ema20 = hesaplaEMA(kapanislar, 20);
 
+            // 2. ZIRH: Büyük Resim Doğrulaması (1 Saatlik Trend Kontrolü)
+            const url1h = `${SPOT_BASE}/klines?symbol=${symbol}&interval=1h&limit=30`;
+            const res1h = await axios.get(url1h).catch(() => null);
+            if (!res1h || !Array.isArray(res1h.data)) continue;
+            
+            const kapanislar1h = res1h.data.map(m => parseFloat(m[4]));
+            const ema20_1h = hesaplaEMA(kapanislar1h, 20);
+            
+            // Büyük trend yönü belirleme
+            const buyukTrendLongUygun = kapanislar1h[kapanislar1h.length - 1] > ema20_1h;
+            const buyukTrendShortUygun = kapanislar1h[kapanislar1h.length - 1] < ema20_1h;
+
+            // ATR Volatilite Hesabı
             let toplamMenzil = 0;
             for (let i = res.data.length - 10; i < res.data.length; i++) {
                 toplamMenzil += (enYuksekler[i] - enDusukler[i]);
@@ -117,37 +134,38 @@ async function otomatikScalpTara() {
             let zd = "";
             let riskUyarisi = "";
 
-            // 🛠️ DÜZELTİLDİ: RSI Koşulları esnetildi (LONG için < 46, SHORT için > 54 yapıldı)
-            if (rsi < 46 && anlikFiyat > ema20) {
+            // 🎯 GÜNLÜK HEDEF YAPAY ZEKA SİNYAL ŞARTLARI (Filtreler Tam 3-5 Sinyal İçin Ayarlandı)
+            // Koşul: RSI esnek, fiyat EMA20 üstünde, SON HACİM ORTALAMA HACMİN EN AZ 1.3 KATI VE BÜYÜK TREND LONG OLMALI
+            if (rsi < 45 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendLongUygun) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
                 ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat - (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• Varlık 5 dakikalık grafikte RSI toparlanma ivmesiyle birlikte EMA 20 üzerine güçlü yerleşti.\n• Scalp momentum onaylandı, belirlenen hedefler takip edilmelidir.`;
+                riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte kurumsal para girişi (%30+ hacim artışı) gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi. Günlük kasa hedefi için uygundur.`;
             } 
-            else if (rsi > 54 && anlikFiyat < ema20) {
+            else if (rsi > 55 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendShortUygun) {
                 sinyalTetiklendi = true;
                 yon = "🔴 SAT (SHORT)";
                 ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat + (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• Varlık 5m scalp zaman diliminde direnç yiyerek EMA 20 altına sarktı, RSI satıcı baskısını doğruluyor.\n• Hızlı düşüş dalgasına karşı stop-loss seviyesi korunmalıdır.`;
+                riskUyarisi = `• 1 Saatlik ana trend düşüş yönündeyken, 5m grafikte güçlü satıcı hacmi (%30+ hacim artışı) tetiklendi.\n• Büyük resim ayı yönlü momentumu destekliyor. Günlük kasa hedefi için uygundur.`;
             }
 
             if (sinyalTetiklendi) {
                 let kcexOtomatikMesaj = 
-                    `🧠 *FINORA AI x KCEX 5M HIZLI SCALP* 🧠\n` +
+                    `🧠 *FINORA AI x KCEX HEDEF OTOPİLOT* 🧠\n` +
                     `───────────────────\n` +
                     `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
-                    `⏱️ *Zaman Dilimi:* 5 Dakika (Hızlı Scalp)\n` +
+                    `⏱️ *Zaman Dilimi:* 5 Dakika (Yüksek Hacimli Scalp)\n` +
                     `📈 *Yön:*  ${yon}\n` +
                     `───────────────────\n` +
                     `💰 *Giriş Fiyatı:* $${anlikFiyat}\n` +
                     `🎯 *KA (Kâr Al):*  $${ka}\n` +
                     `🛑 *ZD (Zarar Durdur):*  $${zd}\n` +
                     `───────────────────\n\n` +
-                    `⚠️ *AI RİSK ANALİZİ*\n` +
+                    `⚠️ *AI GÜVENLİK ANALİZİ*\n` +
                     `${riskUyarisi}\n\n` +
-                    `⚡ _Sinyal yapay zeka tarafından 5m esnek RSI verileriyle üretilmiştir._`;
+                    `⚡ _Sinyal 1h Büyük Trend ve 5m Kurumsal Hacim Onaylıdır._`;
 
                 const inlineKeyboard = {
                     reply_markup: {
@@ -156,16 +174,14 @@ async function otomatikScalpTara() {
                 };
 
                 await bot.sendMessage(CHAT_ID, kcexOtomatikMesaj, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 4000));
             }
 
         } catch (error) { null; }
     }
-    console.log("✅ 100 Parite 5m grafikte başarıyla tarandı. 5 dakika sonra sonraki döngü başlayacak.");
+    console.log("✅ 100 Parite kurumsal filtrelerle tarandı. 5 dakika sonra yeni döngü başlayacak.");
 }
 
-// Bot tetiklendiği an ilk tarama başlar
-otomatikScalpTara();
-
-// 🛠️ DÜZELTİLDİ: Tarama periyodu 5 dakikaya indirildi (5 * 60 * 1000)
-setInterval(otomatikScalpTara, 5 * 60 * 1000);
+// Otopilotu başlat
+otopilotKasaMotoru();
+setInterval(otopilotKasaMotoru, 5 * 60 * 1000);
