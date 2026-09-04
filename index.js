@@ -2,11 +2,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ En son aldığımız çakışmasız güncel token
+// ✅ Güncel çakışmasız token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
-// GÜVENLİ POLLING MODU: Webhook karmaşasını kaldırıyoruz
+// Polling modunu kesin olarak aktif ediyoruz
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,17 +14,24 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI Canli.');
+    res.status(200).send('Finora AI Engine Aktif.');
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
+    try {
+        // 🔥 KRİTİK ADIM: Telegram sunucularında asılı kalan eski webhook'u zorla siliyoruz!
+        await bot.deleteWebHook();
+        console.log("🧼 Eski Telegram Webhook kalıntıları temizlendi, Polling moduna geçildi.");
+    } catch (e) {
+        console.log("Webhook temizleme hatası:", e.message);
+    }
 });
 
 // RENDER UYUMASINI ENGELLEYEN MOTOR
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
-        console.log("Ping atildi.");
+        console.log("Ping başarıyla atıldı.");
     }).catch((e) => null);
 }, 5 * 60 * 1000);
 
@@ -58,7 +65,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
 
 const SPOT_BASE = 'https://binance.com'; 
 
-// 🎯 CANLI ANALİZ KOMUTU
+// 🎯 CANLI ANALİZ KOMUT MOTORU
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     if (!match || !match[1]) return;
@@ -78,7 +85,8 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ Veri çekilemedi.`);
         }
 
-        const kapanislar = res.data.map(m => parseFloat(m[4])); // Kapanış fiyatı (4. indeks)
+        // 🔥 DÜZELTİLDİ: Binance matrisinden 4. indeks (Kapanış Fiyatı) hatasız süzüldü
+        const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const anlikFiyat = kapanislar[kapanislar.length - 1];
         const rsiDegeri = hesaplaRSI(kapanislar, 14);
         const ema20Degeri = hesaplaEMA(kapanislar, 20);
@@ -86,6 +94,7 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ" : "📉 DÜŞÜŞ TRENDİ";
         
         let raporMesaji = `🤖 *FINORA AI TEKNİK RAPORU* 🤖\n` +
+                          `───────────────────\n` +
                           `📌 *Varlık:* ${gelenCoin}\n` +
                           `💰 *Fiyat:* $${anlikFiyat}\n` +
                           `📊 *Trend:* ${trendDurumu}\n` +
@@ -94,6 +103,6 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
 
         bot.sendMessage(chatId, raporMesaji);
     } catch (error) {
-        bot.sendMessage(chatId, `❌ Sembol bulunamadı veya borsa hatası.`);
+        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü borsa üzerinde bulunamadı.`);
     }
 });
