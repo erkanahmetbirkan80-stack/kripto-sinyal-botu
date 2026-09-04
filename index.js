@@ -2,10 +2,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ Güncel ve aktif token bilgilerin
+// ✅ Güncel ve aktif token bilgileriniz
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
+// Polling modunu başlatıyoruz
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,22 +14,30 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - 100 Parite Profesyonel Kasa Motoru Canli.');
+    res.status(200).send('Finora AI - Kasa Motoru Tamamen Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif. Kasa büyütme motoru otopilotta başlatıldı.`);
-    try { await bot.deleteWebHook(); } catch (e) { null; }
+    console.log(`Sunucu aktif. Temizlik başlatılıyor...`);
+    try {
+        // 🔥 KİLİDİ KIRAN EN KRİTİK SATIR: Telegram sunucularında asılı kalan eski webhook kaydını zorla siliyoruz!
+        await bot.deleteWebHook({ drop_pending_updates: true });
+        console.log("🧼 Eski Telegram Webhook kalıntıları dünyadan silindi! Polling yolu tamamen açıldı.");
+        
+        // Botun açıldığını doğrulamak için Telegram'a anında test mesajı atıyoruz
+        await bot.sendMessage(CHAT_ID, "🚀 *Finora AI Otopilot Motoru Başarıyla Uyandı!* \n100 Parite 5m grafikte kurumsal filtrelerle taranmaya başlandı. Sinyaller bu ekrana düşecektir.", { parse_mode: 'Markdown' });
+    } catch (e) { 
+        console.log("Sıfırlama sırasında borsa/telegram uyarısı:", e.message); 
+    }
 });
 
-// Render uyku moduna geçmesin diye canlı tutma motoru
+// Sunucuyu canlı tutan ping motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
-// 📊 MATEMATİKSEL İNDİKATÖR VE HACİM FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -49,7 +58,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
     for (let i = periyot + 1; i < kapanislar.length; i++) {
         let fark = kapanislar[i] - kapanislar[i - 1];
-        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? float => (fark > 0 ? fark : 0) : (fark > 0 ? fark : 0))) / periyot;
+        ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
     if (ortalamaKayip === 0) return 100;
@@ -57,9 +66,8 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// 🧠 YAPAY ZEKA GÜNLÜK HEDEF MOTORU (7/24 OTOPİLOT)
 async function otopilotKasaMotoru() {
-    console.log("⏳ Günlük hedef için 100 paritede 5m mumlar ve hacim kilitleri taranıyor...");
+    console.log("⏳ Günlük hedef için 100 paritede 5m mumlar taranıyor...");
     
     const takipListesi = [
         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 
@@ -91,13 +99,13 @@ async function otopilotKasaMotoru() {
             await new Promise(resolve => setTimeout(resolve, 800)); 
 
             const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`;
-            const res = await axios.get(url);
+            const res = await axios.get(url).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
-            const kapanislar = res.data.map(m => parseFloat(m[4]));
-            const enYuksekler = res.data.map(m => parseFloat(m[2]));
-            const enDusukler = res.data.map(m => parseFloat(m[3]));
-            const hacimler = res.data.map(m => parseFloat(m[5])); 
+            const kapanislar = res.data.map(m => parseFloat(m));
+            const enYuksekler = res.data.map(m => parseFloat(m));
+            const enDusukler = res.data.map(m => parseFloat(m));
+            const hacimler = res.data.map(m => parseFloat(m)); 
             
             const anlikFiyat = kapanislar[kapanislar.length - 1];
             const sonHacim = hacimler[hacimler.length - 1];
@@ -112,7 +120,7 @@ async function otopilotKasaMotoru() {
             const res1h = await axios.get(url1h).catch(() => null);
             if (!res1h || !Array.isArray(res1h.data)) continue;
             
-            const kapanislar1h = res1h.data.map(m => parseFloat(m[4]));
+            const kapanislar1h = res1h.data.map(m => parseFloat(m));
             const ema20_1h = hesaplaEMA(kapanislar1h, 20);
             
             const buyukTrendLongUygun = kapanislar1h[kapanislar1h.length - 1] > ema20_1h;
@@ -130,20 +138,20 @@ async function otopilotKasaMotoru() {
             let zd = "";
             let riskUyarisi = "";
 
-            // 🛠️ OPTİMİZE EDİLDİ: Hacim eşiği %10 artışa (1.1 katı) çekildi, sinyal akışı hızlandırıldı
+            // %10 Esnek Hacim ve Esnek RSI Koşulları
             if (rsi < 46 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.1) && buyukTrendLongUygun) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
                 ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat - (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte dengeli kurumsal para girişi gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi. Günlük kasa hedefi için uygundur.`;
+                riskUyarisi = `• 1 Saatlik ana trend yükseliş yönündeyken, 5m grafikte dengeli kurumsal para girişi gerçekleşti.\n• Yapay zeka büyük trend ve hacim onayını verdi.`;
             } 
             else if (rsi > 54 && anlikFiyat < ema20 && sonHacim > (ortalamaHacim * 1.1) && buyukTrendShortUygun) {
                 sinyalTetiklendi = true;
                 yon = "🔴 SAT (SHORT)";
                 ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
                 zd = (anlikFiyat + (oynaklik * 1.6)).toFixed(4);
-                riskUyarisi = `• 1 Saatlik ana trend düşüş yönündeyken, 5m grafikte kararlı satıcı hacmi tetiklendi.\n• Büyük resim ayı yönlü momentumu destekliyor. Günlük kasa hedefi için uygundur.`;
+                riskUyarisi = `• 1 Saatlik ana trend düşüş yönündeyken, 5m grafikte kararlı satıcı hacmi tetiklendi.\n• Büyük resim ayı yönlü momentumu destekliyor.`;
             }
 
             if (sinyalTetiklendi) {
@@ -151,7 +159,7 @@ async function otopilotKasaMotoru() {
                     `🧠 *FINORA AI x KCEX HEDEF OTOPİLOT* 🧠\n` +
                     `───────────────────\n` +
                     `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
-                    `⏱️ *Zaman Dilimi:* 5 Dakika (Yüksek Hacimli Scalp)\n` +
+                    `⏱️ *Zaman Dilimi:* 5 Dakika (Scalp)\n` +
                     `📈 *Yön:*  ${yon}\n` +
                     `───────────────────\n` +
                     `💰 *Giriş Fiyatı:* $${anlikFiyat}\n` +
