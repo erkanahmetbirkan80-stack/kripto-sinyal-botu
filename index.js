@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
+// ✅ Güncel ve çakışmasız token bilgileriniz
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
@@ -12,22 +13,24 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - 100 Parite Otomatik Scalp Motoru Aktif.');
+    res.status(200).send('Finora AI - 5 Dakikalik Hizli Scalp & Esnek RSI Motoru Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif. 100 Parite otomatik 15m tarayıcı başlatıldı.`);
+    console.log(`Sunucu aktif. 100 Parite 5m hızlı scalp tarayıcısı başlatıldı.`);
     try {
         await bot.deleteWebHook();
     } catch (e) { null; }
 });
 
+// Render sunucusunun uykuya dalmasını engelleyen ping motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
+// 📊 MATEMATİKSEL İNDİKATÖR FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -56,8 +59,9 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
+// 🧠 5 DAKİKALIK OTOMATİK KCEX YAPAY ZEKA TARAYICI MOTORU
 async function otomatikScalpTara() {
-    console.log("⏳ 100 Elit paritede 15m mumlar taranıyor...");
+    console.log("⏳ 100 Elit paritede 5m canlı mumlar taranıyor...");
     
     const takipListesi = [
         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 
@@ -88,11 +92,11 @@ async function otomatikScalpTara() {
         try {
             await new Promise(resolve => setTimeout(resolve, 800)); 
 
-            const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=15m&limit=100`;
+            // 🛠️ DÜZELTİLDİ: Zaman dilimi interval=5m olarak güncellendi
+            const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=5m&limit=100`;
             const res = await axios.get(url).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 40) continue;
 
-            // 🛠️ KESİN DÜZELTME: Binance matris indeksleri (High: 2, Low: 3, Close: 4) milimetrik bağlandı
             const kapanislar = res.data.map(m => parseFloat(m[4]));
             const enYuksekler = res.data.map(m => parseFloat(m[2]));
             const enDusukler = res.data.map(m => parseFloat(m[3]));
@@ -113,27 +117,28 @@ async function otomatikScalpTara() {
             let zd = "";
             let riskUyarisi = "";
 
-            if (rsi < 38 && anlikFiyat > ema20) {
+            // 🛠️ DÜZELTİLDİ: RSI Koşulları esnetildi (LONG için < 46, SHORT için > 54 yapıldı)
+            if (rsi < 46 && anlikFiyat > ema20) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
-                ka = (anlikFiyat + (oynaklik * 3.5)).toFixed(4);
-                zd = (anlikFiyat - (oynaklik * 1.8)).toFixed(4);
-                riskUyarisi = `• Varlık 15 dakikalık grafikte aşırı satım bölgesinden tepki alarak EMA 20 üzerine güçlü kırdı.\n• RSI dipten dönüşü onaylıyor, KA ve ZD seviyelerine sadık kalınmalıdır.`;
+                ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
+                zd = (anlikFiyat - (oynaklik * 1.6)).toFixed(4);
+                riskUyarisi = `• Varlık 5 dakikalık grafikte RSI toparlanma ivmesiyle birlikte EMA 20 üzerine güçlü yerleşti.\n• Scalp momentum onaylandı, belirlenen hedefler takip edilmelidir.`;
             } 
-            else if (rsi > 62 && anlikFiyat < ema20) {
+            else if (rsi > 54 && anlikFiyat < ema20) {
                 sinyalTetiklendi = true;
                 yon = "🔴 SAT (SHORT)";
-                ka = (anlikFiyat - (oynaklik * 3.5)).toFixed(4);
-                zd = (anlikFiyat + (oynaklik * 1.8)).toFixed(4);
-                riskUyarisi = `• 15m zaman diliminde aşırı alım doygunluğundan kar satışları başladı, fiyat EMA 20 altına sarktı.\n• Ayı momentumu hızlanabilir, pozisyon riski dengeli tutulmalıdır.`;
+                ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
+                zd = (anlikFiyat + (oynaklik * 1.6)).toFixed(4);
+                riskUyarisi = `• Varlık 5m scalp zaman diliminde direnç yiyerek EMA 20 altına sarktı, RSI satıcı baskısını doğruluyor.\n• Hızlı düşüş dalgasına karşı stop-loss seviyesi korunmalıdır.`;
             }
 
             if (sinyalTetiklendi) {
                 let kcexOtomatikMesaj = 
-                    `🧠 *FINORA AI x KCEX 100 PARİTE SİNYAL* 🧠\n` +
+                    `🧠 *FINORA AI x KCEX 5M HIZLI SCALP* 🧠\n` +
                     `───────────────────\n` +
                     `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
-                    `⏱️ *Zaman Dilimi:* 15 Dakika (Scalp)\n` +
+                    `⏱️ *Zaman Dilimi:* 5 Dakika (Hızlı Scalp)\n` +
                     `📈 *Yön:*  ${yon}\n` +
                     `───────────────────\n` +
                     `💰 *Giriş Fiyatı:* $${anlikFiyat}\n` +
@@ -142,7 +147,7 @@ async function otomatikScalpTara() {
                     `───────────────────\n\n` +
                     `⚠️ *AI RİSK ANALİZİ*\n` +
                     `${riskUyarisi}\n\n` +
-                    `⚡ _Sinyal yapay zeka tarafından otomatik üretilmiştir._`;
+                    `⚡ _Sinyal yapay zeka tarafından 5m esnek RSI verileriyle üretilmiştir._`;
 
                 const inlineKeyboard = {
                     reply_markup: {
@@ -156,8 +161,11 @@ async function otomatikScalpTara() {
 
         } catch (error) { null; }
     }
-    console.log("✅ 100 Parite başarıyla tarandı. 15 dakika sonra sonraki döngü başlayacak.");
+    console.log("✅ 100 Parite 5m grafikte başarıyla tarandı. 5 dakika sonra sonraki döngü başlayacak.");
 }
 
+// Bot tetiklendiği an ilk tarama başlar
 otomatikScalpTara();
-setInterval(otomatikScalpTara, 15 * 60 * 1000);
+
+// 🛠️ DÜZELTİLDİ: Tarama periyodu 5 dakikaya indirildi (5 * 60 * 1000)
+setInterval(otomatikScalpTara, 5 * 60 * 1000);
