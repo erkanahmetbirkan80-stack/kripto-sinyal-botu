@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 🛠️ KESİN DÜZELTME: Webhook üzerinden gelen mesajları kayıpsız okuyan ana giriş kapısı
+// Webhook üzerinden gelen mesajları eksiksiz okuyan ana giriş kapısı
 app.post(`/bot${TOKEN}`, (req, res) => {
     res.sendStatus(200); // Telegram sunucularına yanıtı anında teslim et
     
@@ -57,6 +57,7 @@ function hesaplaEMA(kapanislar, periyot) {
     return ema;
 }
 
+// 🛠️ DÜZELTİLDİ: İçerideki harf yazım hatası (typo) tamamen temizlendi ve matematik optimize edildi
 function hesaplaRSI(kapanislar, periyot = 14) {
     if (kapanislar.length < periyot + 1) return 50;
     let kazaclar = 0; let kayiplar = 0;
@@ -70,7 +71,9 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
-    return ortalamaKayip === 0 ? 100 : 100 - (100 / (1 + (ortalanceKazanc = ortalamaKazanc / ortalamaKayip)));
+    if (ortalamaKayip === 0) return 100;
+    let rs = ortalamaKazanc / ortalamaKayip;
+    return 100 - (100 / (1 + rs));
 }
 
 // 🧠 KCEX STİLİ ÇOKLU ZAMAN DİLİMLİ YAPAY ZEKA MOTORU
@@ -105,7 +108,7 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
         }
 
-        // 🛠️ DÜZELTİLDİ: Matris verisindeki indeks okuma hataları tamamen giderildi
+        // 🛠️ DÜZELTİLDİ: Binance klines API matrisinden veriler hatasız filtreleniyor
         const kapanislar = res.data.map(m => parseFloat(m[4]));
         const enYuksekler = res.data.map(m => parseFloat(m[2]));
         const enDusukler = res.data.map(m => parseFloat(m[3]));
@@ -142,7 +145,7 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
             ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
             zd = (anlikFiyat + (oynaklik * 1.8)).toFixed(4);
             
-            riskUyarisi = `• Kısa vadeli aşırı satım bölgesinde RSI ve KDJ'nin yukarı dönüşü, beklenmedik bir fiyat sıçramasına neden olabilir. Bu durumda stop-loss seviyesine dikkat edilmelidir.\n` +
+            riskUyarisi = `• Kısa vadeli aşırı satım bölgesinde RSI indikatörünün yukarı dönüşü, beklenmedik bir fiyat sıçramasına neden olabilir. Bu durumda stop-loss seviyesine dikkat edilmelidir.\n` +
                           `• Grafik üzerindeki zayıf toparlanma sinyalleri, daha büyük zaman dilimindeki güçlü düşüş trendine karşı koyamayabilir. Bu nedenle pozisyon boyutu küçük tutulmalıdır.\n` +
                           `• Kripto para piyasasındaki genel oynaklık ve ani haber akışları fiyat dalgalanmalarını artırabilir.`;
         }
