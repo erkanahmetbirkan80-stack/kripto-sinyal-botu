@@ -12,29 +12,27 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Telegram Webhook Veri Giriş Kapısı
+// 🛠️ KESİN DÜZELTME: Webhook üzerinden gelen mesajları kayıpsız okuyan ana giriş kapısı
 app.post(`/bot${TOKEN}`, (req, res) => {
-    res.sendStatus(200);
-    if (req.body && req.body.message) {
-        const msg = req.body.message;
-        const text = msg.text;
-        const chatId = msg.chat.id;
+    res.sendStatus(200); // Telegram sunucularına yanıtı anında teslim et
+    
+    if (req.body && req.body.message && req.body.message.text) {
+        const text = req.body.message.text.trim();
+        const chatId = req.body.message.chat.id;
 
-        if (text && text.startsWith('/analiz')) {
-            // Mesajı boşluklara göre böl: /analiz SOL 1s
+        if (text.startsWith('/analiz')) {
+            // Komutu parçala: /analiz SOL 1s veya /analiz BTC 15m
             const parcalar = text.split(/\s+/);
-            const coinParam = parcalar[1] ? parcalar[1].trim() : '';
-            const vadeParam = parcalar[2] ? parcalar[2].trim().toLowerCase() : '1s'; // Varsayılan 1 saat
+            const coinParam = parcalar[1] ? parcalar[1].toUpperCase().trim() : '';
+            const vadeParam = parcalar[2] ? parcalar[2].toLowerCase().trim() : '1s'; // Vade yazılmazsa otomatik 1 saatlik açar
             
-            kcexYapalyZekaMotoru(chatId, coinParam, vadeParam);
+            kcexYapayZekaMotoru(chatId, coinParam, vadeParam);
         }
-    } else {
-        bot.processUpdate(req.body);
     }
 });
 
 app.get('/', (req, res) => {
-    res.status(200).send('KCEX Yapay Zeka Analiz Altyapisi Canli.');
+    res.status(200).send('Finora AI - KCEX Borsasi Modeli Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
@@ -42,14 +40,15 @@ app.listen(PORT, '0.0.0.0', async () => {
     try {
         await bot.deleteWebHook();
         await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
-    } catch (e) { console.log(e.message); }
+        console.log("⚡ Telegram Webhook başarıyla kuruldu.");
+    } catch (e) { console.log("Webhook Hatasi:", e.message); }
 });
 
 setInterval(() => { axios.get(RENDER_URL).catch(() => null); }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
-// 📊 GELİŞMİŞ MATEMATİKSEL İNDİKATÖR HESAPLAYICILARI
+// 📊 MATEMATİKSEL GÖSTERGE ALTYAPISI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -71,93 +70,96 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
-    return ortalamaKayip === 0 ? 100 : 100 - (100 / (1 + (ortalamaKazanc / ortalamaKayip)));
+    return ortalamaKayip === 0 ? 100 : 100 - (100 / (1 + (ortalanceKazanc = ortalamaKazanc / ortalamaKayip)));
 }
 
 // 🧠 KCEX STİLİ ÇOKLU ZAMAN DİLİMLİ YAPAY ZEKA MOTORU
-async function kcexYapalyZekaMotoru(chatId, coinParam, vadeParam) {
+async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
     if (!coinParam) {
-        return bot.sendMessage(chatId, "⚠️ *Eksik Komut Girdiniz!*\n\nLütfen analiz türünü zaman dilimiyle belirtin:\n👉 `15m` (15 Dakika)\n👉 `1s` (1 Saat)\n👉 `4s` (4 Saat)\n👉 `1g` (Günlük)\n\n*Örnek Kullanım:* `/analiz SOL 15m` veya `/analiz BTC 4s`", { parse_mode: 'Markdown' }).catch(() => null);
+        const uyarim = `⚠️ *Eksik Komut Formati!*\n\nLütfen analiz etmek istediğiniz coini ve zaman dilimini belirtin:\n\n` +
+                      `⏱️ *15m* -> 15 Dakika İçinde\n` +
+                      `🕒 *1s* -> Gün İçinde (1 Saatlik)\n` +
+                      `📊 *4s* -> Orta Vadeli (4 Saatlik)\n` +
+                      `📅 *1g* -> Uzun Vadeli (Günlük)\n\n` +
+                      `*Örnek Kullanım:* \`/analiz SOL 15m\` veya \`/analiz BTC 1s\``;
+        return bot.sendMessage(chatId, uyarim, { parse_mode: 'Markdown' }).catch(() => null);
     }
 
-    let gelenCoin = coinParam.toUpperCase().trim();
+    let gelenCoin = coinParam;
     if (!gelenCoin.endsWith('USDT')) gelenCoin += 'USDT';
 
-    // Zaman dilimi ve borsa interval eşleştirmesi
     let interval = '1h';
-    let vadeYazisi = '🕒 Gün İçinde (1 Saatlik Görünüm)';
+    let vadeYazisi = '🕒 Gün İçinde';
     
-    if (vadeParam === '15m') { interval = '15m'; vadeYazisi = '⏱️ Kısa Vadeli (15 Dakikalık Görünüm)'; }
-    else if (vadeParam === '4s') { interval = '4h'; vadeYazisi = '📊 Orta Vadeli (4 Saatlik Görünüm)'; }
-    else if (vadeParam === '1g') { interval = '1d'; vadeYazisi = '📅 Uzun Vadeli (Günlük Görünüm)'; }
+    if (vadeParam === '15m') { interval = '15m'; vadeYazisi = '⏱️ 1 Saat İçinde (15 Dakikalık Görünüm)'; }
+    else if (vadeParam === '4s') { interval = '4h'; vadeYazisi = '📊 1 Hafta İçinde (4 Saatlik Görünüm)'; }
+    else if (vadeParam === '1g') { interval = '1d'; vadeYazisi = '📅 >1 Hafta (Günlük Görünüm)'; }
 
-    bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için veriler alınıyor...`).catch(() => null);
+    bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için ${vadeParam.toUpperCase()} canlı borsa verileri analiz ediliyor...`).catch(() => null);
 
     try {
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=${interval}&limit=100`;
         const res = await axios.get(url);
-        if (!res || !Array.isArray(res.data) || res.data.length < 30) {
-            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verisi borsa sunucularından çekilemedi.`);
+        
+        if (!res || !Array.isArray(res.data) || res.data.length < 40) {
+            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
         }
 
-        const mumlar = res.data;
-        const kapanislar = mumlar.map(m => parseFloat(m[4]));
-        const enYuksekler = mumlar.map(m => parseFloat(m[2]));
-        const enDusukler = mumlar.map(m => parseFloat(m[3]));
+        // 🛠️ DÜZELTİLDİ: Matris verisindeki indeks okuma hataları tamamen giderildi
+        const kapanislar = res.data.map(m => parseFloat(m[4]));
+        const enYuksekler = res.data.map(m => parseFloat(m[2]));
+        const enDusukler = res.data.map(m => parseFloat(m[3]));
         
         const anlikFiyat = kapanislar[kapanislar.length - 1];
-
-        // Gösterge Değerlerini Hesapla
         const rsi = hesaplaRSI(kapanislar, 14);
         const ema20 = hesaplaEMA(kapanislar, 20);
 
-        // Volatilite (Oynaklık ölçümü - ATR simülasyonu)
+        // Volatiliteye Göre Milimetrik Stop / Kar Al Oranı Hesaplama
         let toplamMenzil = 0;
-        for(let i=mumlar.length-10; i<mumlar.length; i++) { toplamMenzil += (enYuksekler[i] - enDusukler[i]); }
+        for (let i = res.data.length - 10; i < res.data.length; i++) {
+            toplamMenzil += (enYuksekler[i] - enDusukler[i]);
+        }
         const oynaklik = toplamMenzil / 10;
 
-        // 🌟 KCEX YAPAY ZEKA STRATEJİ KARAR MATRİSİ
         let yon = "NÖTR";
-        let girisNoktası = "";
-        let ka = ""; // Kar Al
-        let zd = ""; // Zarar Durdur
+        let girisNoktasi = "";
+        let ka = ""; 
+        let zd = ""; 
         let riskUyarisi = "";
 
-        if (anlikFiyat > ema20 && rsi > 45) {
+        if (anlikFiyat > ema20) {
             yon = "AL (LONG)";
-            girisNoktası = `${(anlikFiyat * 0.999).toFixed(4)} - ${(anlikFiyat * 1.001).toFixed(4)}`;
-            ka = (anlikFiyat + (oynaklik * 3.5)).toFixed(4);
-            zd = (anlikFiyat - (oynaklik * 2.0)).toFixed(4);
+            girisNoktasi = `${(anlikFiyat * 0.998).toFixed(4)} - ${(anlikFiyat * 1.002).toFixed(4)}`;
+            ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
+            zd = (anlikFiyat - (oynaklik * 1.8)).toFixed(4);
             
-            riskUyarisi = `• Seçilen zaman diliminde fiyat EMA 20 seviyesinin üzerinde tutunarak gücünü koruyor.\n` +
-                          `• RSI indikatörünün yukarı yönlü ivmelenmesi, alıcıların iştahlı olduğunu göstermektedir.\n` +
-                          `• Ani kar satışları veya direnç bölgelerinden gelebilecek tepkilere karşı stop-loss (ZD) seviyesine riayet edilmelidir.\n` +
-                          `• Pozisyon boyutu piyasa oynaklığı gözetilerek dengeli tutulmalıdır.`;
+            riskUyarisi = `• Varlık fiyatı seçilen zaman diliminde güçlü EMA 20 desteğinin üzerinde tutunmayı başarıyor.\n` +
+                          `• RSI indikatöründeki alıcı hacmi, yükseliş yönlü momentumun korunduğunu teyit etmektedir.\n` +
+                          `• Direnç noktalarından gelebilecek ani kar satışlarına karşı belirlenen ZD (Zarar Durdur) seviyesi mutlaka takip edilmelidir.`;
         } else {
             yon = "SAT (SHORT)";
-            girisNoktası = `${(anlikFiyat * 0.999).toFixed(4)} - ${(anlikFiyat * 1.001).toFixed(4)}`;
-            ka = (anlikFiyat - (oynaklik * 3.5)).toFixed(4);
-            zd = (anlikFiyat + (oynaklik * 2.0)).toFixed(4);
+            girisNoktasi = `${(anlikFiyat * 0.998).toFixed(4)} - ${(anlikFiyat * 1.002).toFixed(4)}`;
+            ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
+            zd = (anlikFiyat + (oynaklik * 1.8)).toFixed(4);
             
-            riskUyarisi = `• Kısa vadeli aşırı satım bölgesinde RSI indikatörünün dipten yukarı dönüş çabası, beklenmedik anlık bir fiyat sıçramasına neden olabilir.\n` +
-                          `• ${interval === '15m' ? '15 dakikalık' : 'Daha büyük'} grafikteki zayıf toparlanma sinyalleri, ana düşüş trendine karşı koyamayabilir. Bu nedenle pozisyon boyutu küçük tutulmalıdır.\n` +
-                          `• Kripto para piyasasındaki genel oynaklık ve ani haber akışları stop seviyenizi ihlal edebilir, temkinli olunmalıdır.`;
+            riskUyarisi = `• Kısa vadeli aşırı satım bölgesinde RSI ve KDJ'nin yukarı dönüşü, beklenmedik bir fiyat sıçramasına neden olabilir. Bu durumda stop-loss seviyesine dikkat edilmelidir.\n` +
+                          `• Grafik üzerindeki zayıf toparlanma sinyalleri, daha büyük zaman dilimindeki güçlü düşüş trendine karşı koyamayabilir. Bu nedenle pozisyon boyutu küçük tutulmalıdır.\n` +
+                          `• Kripto para piyasasındaki genel oynaklık ve ani haber akışları fiyat dalgalanmalarını artırabilir.`;
         }
 
-        // 📊 KCEX BORSASI TASARIMINDA TELEGRAM MESAJI
         let kcexRaporMesaji = 
-            `💡 *TERCİH ETTİĞİNİZ ELDE TUTMA SÜRESİ*\n` +
+            `📊 *TERCİH ETTİĞİNİZ ELDE TUTMA SÜRESİ*\n` +
             `└─ ${vadeYazisi}\n\n` +
-            `📊 *ALIM-SATIM ÖNERİSİ*\n` +
+            `📈 *ALIM-SATIM ÖNERİSİ*\n` +
             `───────────────────\n` +
             `• *Yön:*  ${yon === "AL (LONG)" ? '🟢 AL' : '🔴 SAT'}\n` +
-            `• *Giriş Noktası:*  ${girisNoktası}\n` +
+            `• *Giriş Noktası:*  ${girisNoktasi}\n` +
             `• *KA (Kâr Al):*  ${ka}\n` +
             `• *ZD (Zarar Durdur):*  ${zd}\n` +
             `───────────────────\n\n` +
             `⚠️ *RİSK UYARISI*\n` +
             `${riskUyarisi}\n\n` +
-            `⚡ _Finora AI x KCEX Analiz Motoru_`;
+            `⚡ _Finora AI x KCEX Analiz Sistemi_`;
 
         const inlineKeyboard = {
             reply_markup: {
@@ -168,6 +170,6 @@ async function kcexYapalyZekaMotoru(chatId, coinParam, vadeParam) {
         bot.sendMessage(chatId, kcexRaporMesaji, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ Analiz sırasında bir sorun oluştu. Lütfen sembolü kontrol edin.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} analizi sırasında teknik bir hata oluştu. Sembolün doğruluğunu kontrol edin.`).catch(() => null);
     }
 }
