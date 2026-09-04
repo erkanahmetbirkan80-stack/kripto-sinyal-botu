@@ -1,10 +1,20 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
+const { HttpsProxyAgent } = require('https-proxy-agent'); // Proxy tünel kütüphanesi
 
-// ✅ Güncel ve çakışmasız token bilgileriniz
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
+
+// ✅ WEBSHARE PANELİNDEKİ AKTİF BİLGİLERİNİZ MİLİMETRİK ENTEGRE EDİLDİ
+const PROXY_IP = '31.59.20.176';
+const PROXY_PORT = '6754';
+const PROXY_USER = 'xciaaybm';
+const PROXY_PASS = 'd61694enfdzv';
+
+// Güvenli Proxy Tünel Bağlantısı oluşturuluyor
+const proxyUrl = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_IP}:${PROXY_PORT}`;
+const agent = new HttpsProxyAgent(proxyUrl);
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
@@ -13,19 +23,19 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI Engine Canli.');
+    res.status(200).send('Finora AI Engine Canli - Londra Proxy Tuneli Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif. Hafifletilmis kurumsal motor baslatildi.`);
+    console.log(`Sunucu aktif. Proxy tüneli başlatıldı.`);
     try {
         await bot.deleteWebHook({ drop_pending_updates: true });
-        console.log("🧼 Eski Webhook kalintilari temizlendi.");
-        await bot.sendMessage(CHAT_ID, "🚀 *Finora AI Kurumsal Hafif Motoru Devrede!* \n100 Vadeli parite sunucuyu yormadan milisaniyeler icinde taranmaya baslandi. Sinyaller buraya dusecektir.", { parse_mode: 'Markdown' });
-    } catch (e) { console.log("Acilis uyarisi:", e.message); }
+        console.log("🧼 Eski Webhook kalıntıları temizlendi.");
+        await bot.sendMessage(CHAT_ID, "🚀 *Finora AI Londra Proxy Motoru Devrede!* \nBinance IP blokajı güvenli tünelle kırıldı. Sinyaller bu ekrana düşecektir.", { parse_mode: 'Markdown' });
+    } catch (e) { console.log(e.message); }
 });
 
-// Sunucuyu canlı tutan ping motoru
+// Render sunucusunun uykuya dalmasını engelleyen ping motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
@@ -34,20 +44,24 @@ const FUTURES_BASE = 'https://binance.com';
 
 // 🧠 HAFİFLETİLMİŞ VE KİLİTLENMEYEN TOPLU TARAMA MOTORU
 async function kurumsalHafifPiyasaTarama() {
-    console.log("⏳ Vadeli piyasa fiyat ve balina paketi milisaniyeler icinde indiriliyor...");
+    console.log("⏳ Vadeli piyasa verileri Londra proxy tüneli üzerinden indiriliyor...");
     try {
-        // 🛠️ EN HAFİF VE HIZLI ENDPOINT: Sadece anlık fiyat ve fonlama verilerini tek seferde çeker
-        const response = await axios.get(`${FUTURES_BASE}/premiumIndex`);
+        // 🔥 KESİN ÇÖZÜM: İstek Axios'a proxy agent parametresiyle teslim edilerek IP engeli aşılıyor
+        const response = await axios.get(`${FUTURES_BASE}/premiumIndex`, {
+            httpAgent: agent,
+            httpsAgent: agent,
+            timeout: 12000 // 12 saniye zaman aşımı güvencesi
+        });
+
         if (!response || !Array.isArray(response.data)) {
-            console.log("❌ Borsa veri paketi alinamadi.");
+            console.log("❌ Borsa veri paketi alınamadı (Proxy tüneli borsa kapısına ulaşamadı).");
             return;
         }
 
-        // Sadece USDT çiftlerini filtrele
         const vadeliPiyasa = response.data.filter(item => item.symbol.endsWith('USDT'));
-        console.log(`📊 Toplam ${vadeliPiyasa.length} adet varlik hafizada analiz ediliyor...`);
+        console.log(`📊 Toplam ${vadeliPiyasa.length} adet varlık Londra tüneli içinde analiz ediliyor...`);
 
-        // Sinyal akışını canlandırmak ve en likit pariteleri yakalamak için ana liste
+        // Yapay zekanın anlık tarayacağı en likit ve hareketli elit pariteler
         const elitSecimListesi = [
             'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 'LINKUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT',
             'DOGEUSDT', 'SHIBUSDT', 'SUIUSDT', 'APTUSDT', 'OPUSDT', 'ARBUSDT', 'NEARUSDT', 'INJUSDT', 'LTCUSDT',
@@ -57,28 +71,22 @@ async function kurumsalHafifPiyasaTarama() {
 
         for (const coin of vadeliPiyasa) {
             const symbol = coin.symbol;
-            
-            // Eğer coin bizim elit seçim listemizde yoksa pas geç (Böylece tarama süper hızlı biter)
             if (!elitSecimListesi.includes(symbol)) continue;
 
             const anlikFiyat = parseFloat(coin.markPrice);
-            
-            // 🛠️ BALİNA VE FONLAMA ORANI ANALİZİ: Profesyonel botların yön tayin etme sırrı
-            const fundingRate = parseFloat(coin.lastFundingRate); 
+            const fundingRate = parseFloat(coin.lastFundingRate); // Balina fonlama oranı baskısı
 
             let sinyalTetiklendi = false;
             let yon = ""; let ka = ""; let zd = ""; let riskUyarisi = "";
-            const oynaklik = anlikFiyat * 0.018; // %1.8'lik ideal scalp hedef marjı
+            const oynaklik = anlikFiyat * 0.018; // %1.8'lik ideal scalp marjı
 
-            // 🎯 YAPAY ZEKA STRATEJİ MATRİSİ (Fonlama Oranı Dönüşlerine Göre Nokta Atışı)
-            // Eğer fonlama oranı çok düşmüşse balinalar dipten LONG topluyor demektir
+            // 🎯 YAPAY ZEKA STRATEJİ MATRİSİ (Fonlama Oranı Dönüşleri)
             if (fundingRate < 0.00005) {
                 sinyalTetiklendi = true; yon = "🟢 AL (LONG)";
                 ka = (anlikFiyat + (oynaklik * 2.5)).toFixed(4);
                 zd = (anlikFiyat - (oynaklik * 1.2)).toFixed(4);
                 riskUyarisi = `• Varlık vadeli tarafta kurumsal alıcıların marjin desteğiyle akümüle oluyor.\n• Fonlama dengesi LONG yönlü momentumu onaylıyor. 1:2 risk/ödül rasyosuna sadık kalınmalıdır.`;
             } 
-            // Eğer fonlama oranı çok şişmişse balinalar tepeden SHORT basıyor demektir
             else if (fundingRate > 0.00035) {
                 sinyalTetiklendi = true; yon = "🔴 SAT (SHORT)";
                 ka = (anlikFiyat - (oynaklik * 2.5)).toFixed(4);
@@ -102,11 +110,11 @@ async function kurumsalHafifPiyasaTarama() {
                     `───────────────────\n\n` +
                     `⚠️ *AI GÜVENLİK ANALİZİ*\n` +
                     `${riskUyarisi}\n\n` +
-                    `⚡ _Sinyal kurumsal premium balina veri paketi analiz edilerek uretilmistir._`;
+                    `⚡ _Sinyal kurumsal temiz proxy tüneli kullanılarak üretilmiştir._`;
 
                 const inlineKeyboard = {
                     reply_markup: {
-                        inline_keyboard: [[{ text: `🚀 Islemi Vadeli Borsada Ac`, url: `https://binance.com{symbol}` }]]
+                        inline_keyboard: [[{ text: `🚀 İşlemi Vadeli Borsada Aç`, url: `https://binance.com{symbol}` }]]
                     }
                 };
 
@@ -114,13 +122,12 @@ async function kurumsalHafifPiyasaTarama() {
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
         }
-        console.log("✅ Hafifletilmis piyasa verileri basariyla tarandi. Yeni dongu 5 dakika sonra.");
+        console.log("✅ Proxy tüneliyle piyasa verileri başarıyla tarandı. Yeni döngü 5 dakika sonra.");
     } catch (error) {
-        console.error("Toplu tarama hatasi:", error.message);
+        console.error("Toplu tarama hatası (Proxy reddetti):", error.message);
     }
 }
 
-// İlk taramayı başlat
+// Otopilot kurumsal taramayı başlat
 kurumsalHafifPiyasaTarama();
-// Her 5 dakikada bir sunucuyu hiç yormadan piyasayı baştan aşağı tarar
 setInterval(kurumsalHafifPiyasaTarama, 5 * 60 * 1000);
