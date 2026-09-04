@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
+// ✅ Güncel ve çakışmasız token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 const RENDER_URL = 'https://onrender.com'; 
@@ -12,16 +13,19 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Geliştirilmiş Webhook Giriş Kapısı
+// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: Gelen parametreleri hatasız ayrıştırır
 app.post(`/bot${TOKEN}`, (req, res) => {
-    res.sendStatus(200); // Telegram'a yanıtı anında vererek tıkanmayı önle
+    res.sendStatus(200); // Telegram'a yanıtı anında teslim eterek tıkanmayı önle
     
     if (req.body && req.body.message && req.body.message.text) {
         const text = req.body.message.text.trim();
         const chatId = req.body.message.chat.id;
 
         if (text.startsWith('/analiz')) {
-            const parcalar = text.split(/\s+/);
+            // Mesajı boşluklara göre güvenli bir şekilde parçala
+            const parcalar = text.split(/\s+/); 
+            
+            // Parametre indeksleri kaymasın diye doğrusal kontrol
             const coinParam = parcalar[1] ? parcalar[1].toUpperCase().trim() : '';
             const vadeParam = parcalar[2] ? parcalar[2].toLowerCase().trim() : '1s';
             
@@ -31,11 +35,11 @@ app.post(`/bot${TOKEN}`, (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - KCEX Altyapisi Canli.');
+    res.status(200).send('Finora AI - KCEX Borsasi Modeli Canli.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif.`);
+    console.log(`Sunucu 3000 portunda aktif.`);
     try {
         await bot.deleteWebHook();
         await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
@@ -43,15 +47,19 @@ app.listen(PORT, '0.0.0.0', async () => {
     } catch (e) { console.log("Webhook Hatasi:", e.message); }
 });
 
+// Sunucu uyku moduna geçmesin diye ping motoru
 setInterval(() => { axios.get(RENDER_URL).catch(() => null); }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
+// 📊 MATEMATİKSEL İNDİKATÖR ALTYAPISI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
     let ema = kapanislar.slice(0, periyot).reduce((a, b) => a + b, 0) / periyot;
-    for (let i = periyot; i < kapanislar.length; i++) { ema = (kapanislar[i] * k) + (ema * (1 - k)); }
+    for (let i = periyot; i < kapanislar.length; i++) { 
+        ema = (kapanislar[i] * k) + (ema * (1 - k)); 
+    }
     return ema;
 }
 
@@ -62,16 +70,19 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         let fark = kapanislar[i] - kapanislar[i - 1];
         if (fark > 0) kazaclar += fark; else kayiplar += Math.abs(fark);
     }
-    let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
+    let ortalamaKazanc = kazaclar / periyot; 
+    let ortalamaKayip = kayiplar / periyot;
     for (let i = periyot + 1; i < kapanislar.length; i++) {
         let fark = kapanislar[i] - kapanislar[i - 1];
         ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
         ortalamaKayip = (ortalamaKayip * (periyot - 1) + (fark < 0 ? Math.abs(fark) : 0)) / periyot;
     }
     if (ortalamaKayip === 0) return 100;
-    return 100 - (100 / (1 + (ortalamaKazanc / ortalamaKayip)));
+    let rs = ortalamaKazanc / ortalamaKayip;
+    return 100 - (100 / (1 + rs));
 }
 
+// 🧠 KCEX STİLİ ÇOKLU ZAMAN DİLİMLİ YAPAY ZEKA MOTORU
 async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
     if (!coinParam) {
         const uyarim = `⚠️ *Eksik Komut Formati!*\n\nLütfen analiz etmek istediğiniz coini ve zaman dilimini belirtin:\n\n*Örnek Kullanım:* \`/analiz SOL 15m\` veya \`/analiz BTC 1s\``;
@@ -91,14 +102,14 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
     bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için ${vadeParam.toUpperCase()} canlı borsa verileri analiz ediliyor...`).catch(() => null);
 
     try {
-        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=${interval}&limit=100`;
+        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=interval&limit=100`;
         const res = await axios.get(url);
         
         if (!res || !Array.isArray(res.data) || res.data.length < 40) {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
         }
 
-        // ✅ TAM DOĞRULAMA: Dizi indeksleri m[4], m[2] ve m[3] olarak milimetrik düzeltildi
+        // ✅ BİNANCE MATRİS OKUYUCU DÜZELTİLDİ: Kapanış, en yüksek ve en düşük fiyatlar tam indekslerinden çekildi
         const kapanislar = res.data.map(m => parseFloat(m[4]));
         const enYuksekler = res.data.map(m => parseFloat(m[2]));
         const enDusukler = res.data.map(m => parseFloat(m[3]));
@@ -107,6 +118,7 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
         const rsi = hesaplaRSI(kapanislar, 14);
         const ema20 = hesaplaEMA(kapanislar, 20);
 
+        // Son 10 mumun oynaklığına göre dinamik volatilite hesabı
         let toplamMenzil = 0;
         for (let i = res.data.length - 10; i < res.data.length; i++) {
             toplamMenzil += (enYuksekler[i] - enDusukler[i]);
