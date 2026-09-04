@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: Parametre dizilimleri %100 düzeltildi
+// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: İndeks kaymaları tamamen düzeltildi
 app.post(`/bot${TOKEN}`, (req, res) => {
     res.sendStatus(200); // Telegram sunucusunu bekletmeden anında 200 OK dön
     
@@ -24,7 +24,7 @@ app.post(`/bot${TOKEN}`, (req, res) => {
         if (text.startsWith('/analiz')) {
             const parcalar = text.split(/\s+/); // Boşluklara göre ayır
             
-            // Örnek: "/analiz SOL 15m" -> parcalar[1] = "SOL", parcalar[2] = "15m"
+            // 🛠️ KESİN DÜZELTME: /analiz SOL 15m formatında indeksler 1 ve 2 olmalıdır!
             const coinParam = parcalar[1] ? parcalar[1].toUpperCase().trim() : '';
             const vadeParam = parcalar[2] ? parcalar[2].toLowerCase().trim() : '1s';
             
@@ -100,7 +100,6 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
     bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için ${vadeParam.toUpperCase()} canlı borsa verileri analiz ediliyor...`).catch(() => null);
 
     try {
-        // 🛠️ DÜZELTİLDİ: interval parametresi dinamik hale getirildi
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=${interval}&limit=100`;
         const res = await axios.get(url);
         
@@ -108,7 +107,7 @@ async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
         }
 
-        // 🛠️ DÜZELTİLDİ: İç diziler, [2], [3] indekslerine göre milimetrik çekiliyor
+        // ✅ TAM MATRİS HARİTALAMA: Binance mum verilerindeki indeksler düzeltildi
         const kapanislar = res.data.map(m => parseFloat(m[4]));
         const enYuksekler = res.data.map(m => parseFloat(m[2]));
         const enDusukler = res.data.map(m => parseFloat(m[3]));
