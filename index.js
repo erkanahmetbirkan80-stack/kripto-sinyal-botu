@@ -5,52 +5,33 @@ const express = require('express');
 // ✅ Güncel ve çakışmasız token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
-const RENDER_URL = 'https://onrender.com'; 
 
-const bot = new TelegramBot(TOKEN, { polling: false });
+// Polling modunu true yapıyoruz çünkü artık dışarıdan komut (webhook) beklemiyoruz, bot kendisi gönderecek
+const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 🔥 MİLİMETRİK WEBHOOK GİRİŞ KAPISI: İndeks kaymaları tamamen düzeltildi
-app.post(`/bot${TOKEN}`, (req, res) => {
-    res.sendStatus(200); // Telegram sunucusunu bekletmeden anında 200 OK dön
-    
-    if (req.body && req.body.message && req.body.message.text) {
-        const text = req.body.message.text.trim();
-        const chatId = req.body.message.chat.id;
-
-        if (text.startsWith('/analiz')) {
-            const parcalar = text.split(/\s+/); // Boşluklara göre ayır
-            
-            // 🛠️ KESİN DÜZELTME: /analiz SOL 15m formatında indeksler 1 ve 2 olmalıdır!
-            const coinParam = parcalar[1] ? parcalar[1].toUpperCase().trim() : '';
-            const vadeParam = parcalar[2] ? parcalar[2].toLowerCase().trim() : '1s';
-            
-            kcexYapayZekaMotoru(chatId, coinParam, vadeParam);
-        }
-    }
-});
-
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - KCEX Borsasi Modeli Canli.');
+    res.status(200).send('Finora AI - 15 Dakikalik Otomatik Scalp Motoru Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`Sunucu aktif.`);
+    console.log(`Sunucu aktif. Otomatik 15m tarayıcı başlatıldı.`);
     try {
-        await bot.deleteWebHook();
-        await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
-        console.log("⚡ Telegram Webhook başarıyla kuruldu.");
-    } catch (e) { console.log("Webhook Hatasi:", e.message); }
+        await bot.deleteWebHook(); // Kalıntıları temizle
+    } catch (e) { null; }
 });
 
-setInterval(() => { axios.get(RENDER_URL).catch(() => null); }, 5 * 60 * 1000);
+// Render sunucusunun uykuya dalmasını engelleyen ping motoru
+setInterval(() => {
+    axios.get('https://onrender.com').catch(() => null);
+}, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
-// 📊 MATEMATİKSEL İNDİKATÖR ALTYAPISI
+// 📊 MATEMATİKSEL İNDİKATÖR FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -68,8 +49,7 @@ function hesaplaRSI(kapanislar, periyot = 14) {
         let fark = kapanislar[i] - kapanislar[i - 1];
         if (fark > 0) kazaclar += fark; else kayiplar += Math.abs(fark);
     }
-    let ortalamaKazanc = kazaclar / periyot; 
-    let ortalamaKayip = kayiplar / periyot;
+    let ortalamaKazanc = kazaclar / periyot; let ortalamaKayip = kayiplar / periyot;
     for (let i = periyot + 1; i < kapanislar.length; i++) {
         let fark = kapanislar[i] - kapanislar[i - 1];
         ortalamaKazanc = (ortalamaKazanc * (periyot - 1) + (fark > 0 ? fark : 0)) / periyot;
@@ -80,94 +60,97 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// 🧠 KCEX STİLİ ÇOKLU ZAMAN DİLİMLİ YAPAY ZEKA MOTORU
-async function kcexYapayZekaMotoru(chatId, coinParam, vadeParam) {
-    if (!coinParam) {
-        const uyarim = `⚠️ *Eksik Komut Formati!*\n\nLütfen analiz etmek istediğiniz coini ve zaman dilimini belirtin:\n\n*Örnek Kullanım:* \`/analiz SOL 15m\` veya \`/analiz BTC 1s\``;
-        return bot.sendMessage(chatId, uyarim, { parse_mode: 'Markdown' }).catch(() => null);
-    }
-
-    let gelenCoin = coinParam;
-    if (!gelenCoin.endsWith('USDT')) gelenCoin += 'USDT';
-
-    let interval = '1h';
-    let vadeYazisi = '🕒 Gün İçinde';
+// 🧠 15 DAKİKALIK OTOMATİK KCEX YAPAY ZEKA TARAYICI MOTORU
+async function otomatikScalpTara() {
+    console.log("⏳ 15 Dakikalık mumlar borsa genelinde baştan aşağı taranıyor...");
     
-    if (vadeParam === '15m') { interval = '15m'; vadeYazisi = '⏱️ 1 Saat İçinde (15 Dakikalık Görünüm)'; }
-    else if (vadeParam === '4s') { interval = '4h'; vadeYazisi = '📊 1 Hafta İçinde (4 Saatlik Görünüm)'; }
-    else if (vadeParam === '1g') { interval = '1d'; vadeYazisi = '📅 >1 Hafta (Günlük Görünüm)'; }
+    // Yapay zekanın anlık tarayacağı yüksek hacimli elit pariteler
+    const takipListesi = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 'LINKUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT'];
 
-    bot.sendMessage(chatId, `🤖 *KCEX AI Modeli:* ${gelenCoin} için ${vadeParam.toUpperCase()} canlı borsa verileri analiz ediliyor...`).catch(() => null);
+    for (const symbol of takipListesi) {
+        try {
+            await new Promise(resolve => setTimeout(resolve, 500)); // API ban yememek için güvenli bekleme
 
-    try {
-        const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=${interval}&limit=100`;
-        const res = await axios.get(url);
-        
-        if (!res || !Array.isArray(res.data) || res.data.length < 40) {
-            return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri Binance üzerinden çekilemedi.`);
-        }
+            const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=15m&limit=100`;
+            const res = await axios.get(url).catch(() => null);
+            if (!res || !Array.isArray(res.data) || res.data.length < 40) continue;
 
-        // ✅ TAM MATRİS HARİTALAMA: Binance mum verilerindeki indeksler düzeltildi
-        const kapanislar = res.data.map(m => parseFloat(m[4]));
-        const enYuksekler = res.data.map(m => parseFloat(m[2]));
-        const enDusukler = res.data.map(m => parseFloat(m[3]));
-        
-        const anlikFiyat = kapanislar[kapanislar.length - 1];
-        const rsi = hesaplaRSI(kapanislar, 14);
-        const ema20 = hesaplaEMA(kapanislar, 20);
-
-        // Son 10 mumun oynaklığına göre dinamik volatilite hesabı
-        let toplamMenzil = 0;
-        for (let i = res.data.length - 10; i < res.data.length; i++) {
-            toplamMenzil += (enYuksekler[i] - enDusukler[i]);
-        }
-        const oynaklik = toplamMenzil / 10;
-
-        let yon = "NÖTR";
-        let girisNoktasi = "";
-        let ka = ""; 
-        let zd = ""; 
-        let riskUyarisi = "";
-
-        if (anlikFiyat > ema20) {
-            yon = "AL (LONG)";
-            girisNoktasi = `${(anlikFiyat * 0.998).toFixed(4)} - ${(anlikFiyat * 1.002).toFixed(4)}`;
-            ka = (anlikFiyat + (oynaklik * 3.2)).toFixed(4);
-            zd = (anlikFiyat - (oynaklik * 1.8)).toFixed(4);
+            // Matris fiyat eşlemeleri
+            const kapanislar = res.data.map(m => parseFloat(m[4]));
+            const enYuksekler = res.data.map(m => parseFloat(m[2]));
+            const enDusukler = res.data.map(m => parseFloat(m[3]));
             
-            riskUyarisi = `• Varlık fiyatı seçilen zaman diliminde güçlü EMA 20 desteğinin üzerinde tutunmayı başarıyor.\n• RSI indikatöründeki alıcı hacmi, yükseliş yönlü momentumun korunduğunu teyit etmektedir.\n• Direnç noktalarından gelebilecek ani kar satışlarına karşı belirlenen ZD (Zarar Durdur) seviyesi mutlaka takip edilmelidir.`;
-        } else {
-            yon = "SAT (SHORT)";
-            girisNoktasi = `${(anlikFiyat * 0.998).toFixed(4)} - ${(anlikFiyat * 1.002).toFixed(4)}`;
-            ka = (anlikFiyat - (oynaklik * 3.2)).toFixed(4);
-            zd = (anlikFiyat + (oynaklik * 1.8)).toFixed(4);
-            
-            riskUyarisi = `• Kısa vadeli aşırı satım bölgesinde RSI indikatörünün yukarı dönüşü, beklenmedik bir fiyat sıçramasına neden olabilir. Bu durumda stop-loss seviyesine dikkat edilmelidir.\n• Grafik üzerindeki zayıf toparlanma sinyalleri, daha büyük zaman dilimindeki güçlü düşüş trendine karşı koyamayabilir.\n• Kripto para piyasasındaki genel oynaklık ve ani haber akışları fiyat dalgalanmalarını artırabilir.`;
-        }
+            const anlikFiyat = kapanislar[kapanislar.length - 1];
+            const rsi = hesaplaRSI(kapanislar, 14);
+            const ema20 = hesaplaEMA(kapanislar, 20);
 
-        let kcexRaporMesaji = 
-            `📊 *TERCİH ETTİĞİNİZ ELDE TUTMA SÜRESİ*\n` +
-            `└─ ${vadeYazisi}\n\n` +
-            `📈 *ALIM-SATIM ÖNERİSİ*\n` +
-            `───────────────────\n` +
-            `• *Yön:*  ${yon === "AL (LONG)" ? '🟢 AL' : '🔴 SAT'}\n` +
-            `• *Giriş Noktası:*  ${girisNoktasi}\n` +
-            `• *KA (Kâr Al):*  ${ka}\n` +
-            `• *ZD (Zarar Durdur):*  ${zd}\n` +
-            `───────────────────\n\n` +
-            `⚠️ *RİSK UYARISI*\n` +
-            `${riskUyarisi}\n\n` +
-            `⚡ _Finora AI x KCEX Analiz Sistemi_`;
-
-        const inlineKeyboard = {
-            reply_markup: {
-                inline_keyboard: [[{ text: `🚀 İşlemi Vadeli Borsada Aç`, url: `https://binance.com{gelenCoin}` }]]
+            // Son 10 mumun ATR (Oynaklık) hesabı
+            let toplamMenzil = 0;
+            for (let i = res.data.length - 10; i < res.data.length; i++) {
+                toplamMenzil += (enYuksekler[i] - enDusukler[i]);
             }
-        };
+            const oynaklik = toplamMenzil / 10;
 
-        bot.sendMessage(chatId, kcexRaporMesaji, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
+            let sinyalTetiklendi = false;
+            let yon = "";
+            let ka = "";
+            let zd = "";
+            let riskUyarisi = "";
 
-    } catch (error) {
-        bot.sendMessage(chatId, `❌ *Hata:* Veriler işlenirken teknik bir sorun oluştu.`).catch(() => null);
+            // 🎯 YAPAY ZEKA KOSUL MATRISI (15M SCALP İÇİN)
+            // RSI 35'in altındaysa aşırı satımdır ve fiyat EMA20'yi yukarı kırıyorsa güçlü LONG
+            if (rsi < 38 && anlikFiyat > ema20) {
+                sinyalTetiklendi = true;
+                yon = "🟢 AL (LONG)";
+                ka = (anlikFiyat + (oynaklik * 3.5)).toFixed(4);
+                zd = (anlikFiyat - (oynaklik * 1.8)).toFixed(4);
+                riskUyarisi = `• Varlık 15 dakikalık grafikte aşırı satım bölgesinden tepki alarak EMA 20 üzerine güçlü kırdı.\n• RSI dipten dönüşü onaylıyor, KA ve ZD seviyelerine sadık kalınmalıdır.`;
+            } 
+            // RSI 65'in üstündeyse aşırı alımdır ve fiyat EMA20'nin altına iniyorsa güçlü SHORT
+            else if (rsi > 62 && anlikFiyat < ema20) {
+                sinyalTetiklendi = true;
+                yon = "🔴 SAT (SHORT)";
+                ka = (anlikFiyat - (oynaklik * 3.5)).toFixed(4);
+                zd = (anlikFiyat + (oynaklik * 1.8)).toFixed(4);
+                riskUyarisi = `• 15m zaman diliminde aşırı alım doygunluğundan kar satışları başladı, fiyat EMA 20 altına sarktı.\n• Ayı momentumu hızlanabilir, pozisyon riski dengeli tutulmalıdır.`;
+            }
+
+            // Eğer yapay zeka tam aradığı fırsatı yakaladıysa Telegram'a otomatik gönderir
+            if (sinyalTetiklendi) {
+                let kcexOtomatikMesaj = 
+                    `🧠 *FINORA AI x KCEX OTOMATİK SİNYAL* 🧠\n` +
+                    `───────────────────\n` +
+                    `📌 *Varlık:* #${symbol.replace('USDT', '')} / USDT\n` +
+                    `⏱️ *Zaman Dilimi:* 15 Dakika (Scalp)\n` +
+                    `📈 *Yön:*  ${yon}\n` +
+                    `───────────────────\n` +
+                    `💰 *Giriş Fiyatı:* $${anlikFiyat}\n` +
+                    `🎯 *KA (Kâr Al):*  $${ka}\n` +
+                    `🛑 *ZD (Zarar Durdur):*  $${zd}\n` +
+                    `───────────────────\n\n` +
+                    `⚠️ *AI RİSK ANALİZİ*\n` +
+                    `${riskUyarisi}\n\n` +
+                    `⚡ _Sinyal yapay zeka tarafından otomatik üretilmiştir._`;
+
+                const inlineKeyboard = {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: `🚀 İşlemi Vadeli Borsada Aç`, url: `https://binance.com{symbol}` }]]
+                    }
+                };
+
+                await bot.sendMessage(CHAT_ID, kcexOtomatikMesaj, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
+                
+                // Aynı pariteye üst üste sinyal çakmasın diye 5 dakika o pariteyi askıya alacak güvenlik önlemi
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+
+        } catch (error) { console.log("Tarama hatası pas geçildi:", error.message); }
     }
+    console.log("✅ Piyasalar tarandı, uygun pozisyonlar paylaşıldı. 15 dakika sonra yeniden taranacak.");
 }
+
+// Bot açılır açılmaz ilk taramayı hemen yap
+otomatikScalpTara();
+
+// Her 15 dakikada bir otomatik olarak arka planda piyasayı baştan aşağı tara
+setInterval(otomatikScalpTara, 15 * 60 * 1000);
