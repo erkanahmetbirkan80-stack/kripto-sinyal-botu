@@ -80,7 +80,7 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ Veri çekilemedi.`);
         }
 
-        // 🔥 KESİN DÜZELTME: Binance mum matrisinden kapanış fiyatı (4. indeks) başarıyla çekildi
+        // 🛠️ KESİN VERİ HARİTALAMA DÜZELTMESİ: m[4] ile mumların kapanış fiyatları milimetrik ayrıştırıldı
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const anlikFiyat = kapanislar[kapanislar.length - 1];
         
