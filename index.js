@@ -2,11 +2,9 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ Güncel çakışmasız token bilgilerin
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
-// Polling modunu kesin olarak aktif ediyoruz
 const bot = new TelegramBot(TOKEN, { polling: true });
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +18,6 @@ app.get('/', (req, res) => {
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
     try {
-        // 🔥 KRİTİK ADIM: Telegram sunucularında asılı kalan eski webhook'u zorla siliyoruz!
         await bot.deleteWebHook();
         console.log("🧼 Eski Telegram Webhook kalıntıları temizlendi, Polling moduna geçildi.");
     } catch (e) {
@@ -28,7 +25,6 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
 });
 
-// RENDER UYUMASINI ENGELLEYEN MOTOR
 setInterval(() => {
     axios.get('https://onrender.com').then(() => {
         console.log("Ping başarıyla atıldı.");
@@ -65,7 +61,6 @@ function hesaplaRSI(kapanislar, periyot = 14) {
 
 const SPOT_BASE = 'https://binance.com'; 
 
-// 🎯 CANLI ANALİZ KOMUT MOTORU
 bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     if (!match || !match[1]) return;
@@ -81,28 +76,33 @@ bot.onText(/\/analiz (.+)/, async (msg, match) => {
         const url = `${SPOT_BASE}/klines?symbol=${gelenCoin}&interval=5m&limit=100`;
         const res = await axios.get(url);
         
-        if (!res || !Array.isArray(res.data)) {
+        if (!res || !Array.isArray(res.data) || res.data.length < 50) {
             return bot.sendMessage(chatId, `❌ Veri çekilemedi.`);
         }
 
-        // 🔥 DÜZELTİLDİ: Binance matrisinden 4. indeks (Kapanış Fiyatı) hatasız süzüldü
+        // 🔥 KESİN DÜZELTME: Binance mum matrisinden kapanış fiyatı (4. indeks) başarıyla çekildi
         const kapanislar = res.data.map(m => parseFloat(m[4])); 
         const anlikFiyat = kapanislar[kapanislar.length - 1];
+        
         const rsiDegeri = hesaplaRSI(kapanislar, 14);
         const ema20Degeri = hesaplaEMA(kapanislar, 20);
 
-        let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ" : "📉 DÜŞÜŞ TRENDİ";
+        let trendDurumu = anlikFiyat > ema20Degeri ? "📈 YÜKSELİŞ TRENDİ (Fiyat EMA 20 Üstünde)" : "📉 DÜŞÜŞ TRENDİ (Fiyat EMA 20 Altında)";
+        let rsiYorumu = "Neutral ⚖️ (Yatay Piyasa)";
+        if (rsiDegeri < 35) rsiYorumu = "Aşırı Satım 🟢 (Alım Fırsatı)";
+        if (rsiDegeri > 65) rsiYorumu = "Aşırı Alım 🔴 (Satış Baskısı)";
         
         let raporMesaji = `🤖 *FINORA AI TEKNİK RAPORU* 🤖\n` +
                           `───────────────────\n` +
                           `📌 *Varlık:* ${gelenCoin}\n` +
                           `💰 *Fiyat:* $${anlikFiyat}\n` +
+                          `───────────────────\n` +
                           `📊 *Trend:* ${trendDurumu}\n` +
-                          `• RSI (14): ${rsiDegeri.toFixed(2)}\n` +
-                          `• EMA (20): $${ema20Degeri.toFixed(2)}`;
+                          `• RSI (14): ${rsiDegeri.toFixed(2)} (${rsiYorumu})\n` +
+                          `• EMA (20): $${ema20Degeri.toFixed(4)}`;
 
         bot.sendMessage(chatId, raporMesaji);
     } catch (error) {
-        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü borsa üzerinde bulunamadı.`);
+        bot.sendMessage(chatId, `❌ ${gelenCoin} sembolü borsa üzerinde işlenirken bir hata oluştu.`);
     }
 });
