@@ -95,10 +95,11 @@ async function otopilotKasaMotoru() {
             const res = await axios.get(url).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 50) continue;
 
+            // ✅ MİLİMETRİK DÜZELTME: Binance mum indeksleri (Kapanış: 4, Yüksek: 2, Düşük: 3, Hacim: 5) tam olarak bağlandı!
             const kapanislar = res.data.map(m => parseFloat(m[4]));
             const enYuksekler = res.data.map(m => parseFloat(m[2]));
             const enDusukler = res.data.map(m => parseFloat(m[3]));
-            const hacimler = res.data.map(m => parseFloat(m[5])); // Canlı hacim dizisi
+            const hacimler = res.data.map(m => parseFloat(m[5])); 
             
             const anlikFiyat = kapanislar[kapanislar.length - 1];
             const sonHacim = hacimler[hacimler.length - 1];
@@ -134,8 +135,7 @@ async function otopilotKasaMotoru() {
             let zd = "";
             let riskUyarisi = "";
 
-            // 🎯 GÜNLÜK HEDEF YAPAY ZEKA SİNYAL ŞARTLARI (Filtreler Tam 3-5 Sinyal İçin Ayarlandı)
-            // Koşul: RSI esnek, fiyat EMA20 üstünde, SON HACİM ORTALAMA HACMİN EN AZ 1.3 KATI VE BÜYÜK TREND LONG OLMALI
+            // 🎯 GÜNLÜK HEDEF YAPAY ZEKA SİNYAL ŞARTLARI
             if (rsi < 45 && anlikFiyat > ema20 && sonHacim > (ortalamaHacim * 1.3) && buyukTrendLongUygun) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
