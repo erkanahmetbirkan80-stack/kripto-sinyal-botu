@@ -2,7 +2,6 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// ✅ Güncel ve çakışmasız token bilgileriniz
 const TOKEN = '8974920211:AAH0FIFByn3035f94CPexmAirl_-FT3h1x8';
 const CHAT_ID = '7547417448';
 
@@ -13,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).send('Finora AI - 100 Elit Parite Otomatik Scalp Motoru Aktif.');
+    res.status(200).send('Finora AI - 100 Parite Otomatik Scalp Motoru Aktif.');
 });
 
 app.listen(PORT, '0.0.0.0', async () => {
@@ -23,14 +22,12 @@ app.listen(PORT, '0.0.0.0', async () => {
     } catch (e) { null; }
 });
 
-// Render sunucusunun uykuya dalmasını engelleyen ping motoru
 setInterval(() => {
     axios.get('https://onrender.com').catch(() => null);
 }, 5 * 60 * 1000);
 
 const SPOT_BASE = 'https://binance.com';
 
-// 📊 MATEMATİKSEL İNDİKATÖR FONKSİYONLARI
 function hesaplaEMA(kapanislar, periyot) {
     if (kapanislar.length < periyot) return kapanislar[kapanislar.length - 1];
     const k = 2 / (periyot + 1);
@@ -59,11 +56,9 @@ function hesaplaRSI(kapanislar, periyot = 14) {
     return 100 - (100 / (1 + rs));
 }
 
-// 🧠 15 DAKİKALIK OTOMATİK KCEX YAPAY ZEKA TARAYICI MOTORU
 async function otomatikScalpTara() {
     console.log("⏳ 100 Elit paritede 15m mumlar taranıyor...");
     
-    // 🔥 TAM 100 ADET EN POPÜLER VE YÜKSEK HACİMLİ VADELİ İŞLEM PARİTESİ ENTEGRE EDİLDİ
     const takipListesi = [
         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'AVAXUSDT', 
         'LINKUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT', 'MATICUSDT',
@@ -72,42 +67,40 @@ async function otomatikScalpTara() {
         'FETUSDT', 'RENDERUSDT', 'WIFUSDT', 'PEPEUSDT', 'FLOKIUSDT',
         'BONKUSDT', 'TONUSDT', 'STXUSDT', 'FTMUSDT', 'TIAUSDT',
         'ATOMUSDT', 'XLMUSDT', 'TRXUSDT', 'UNIUSDT', 'FILUSDT',
-        'LDOUSDT', 'SEIUSDT', 'TIAUSDT', 'SNDUSDT', 'MANAUSDT',
+        'LDOUSDT', 'SEIUSDT', 'SNDUSDT', 'MANAUSDT',
         'GALAUSDT', 'AXSUSDT', 'APEUSDT', 'GMTUSDT', 'GRTUSDT',
         'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'CRVUSDT', 'SUSHIUSDT',
         'DYDXUSDT', 'RUNEUSDT', 'EGLDUSDT', 'THETAUSDT', 'ALGOUSDT',
-        'FTMUSDT', 'IMXUSDT', 'FLOWUSDT', 'CHZUSDT', 'ONEUSDT',
+        'IMXUSDT', 'FLOWUSDT', 'CHZUSDT', 'ONEUSDT',
         'ANKRUSDT', 'LRCUSDT', 'ZILUSDT', 'JASMYUSDT', 'ENSUSDT',
         'ICPUSDT', 'MINAUSDT', 'WOOUSDT', 'STGUSDT', 'MAGICUSDT',
         'DYMUSDT', 'PYTHUSDT', 'JUPUSDT', 'WUSDT', 'ENAUSDT',
-        'STRKUSDT', 'ZKUSDT', 'ZKUSDT', 'IOUSDT', 'ZKUSDT',
+        'STRKUSDT', 'ZKUSDT', 'IOUSDT',
         'NOTUSDT', 'BOMEUSDT', 'MEMEUSDT', 'TURBOUSDT', '1000SATSUSDT',
         'PEOPLEUSDT', 'POPCATUSDT', 'MEWUSDT', 'BRETTUSDT', 'MYROUSDT',
         'ORDIUSDT', '1000RATSUSDT', 'ARKMUSDT', 'ALTUSDT', 'MANTAUSDT',
         'XAIUSDT', 'AIUSDT', 'NFPUSDT', 'CYBERUSDT', 'YGGUSDT'
     ];
 
-    // Tekrarlanan olası pariteleri engellemek için benzersiz küme (Set) filtrelemesi
     const benzersizListe = [...new Set(takipListesi)];
 
     for (const symbol of benzersizListe) {
         try {
-            // 💡 GÜVENLİK FİLTRESİ: 100 coini tararken borsa banı yememek için 800ms bekleme
             await new Promise(resolve => setTimeout(resolve, 800)); 
 
             const url = `${SPOT_BASE}/klines?symbol=${symbol}&interval=15m&limit=100`;
             const res = await axios.get(url).catch(() => null);
             if (!res || !Array.isArray(res.data) || res.data.length < 40) continue;
 
-            const kapanislar = res.data.map(m => parseFloat(m));
-            const enYuksekler = res.data.map(m => parseFloat(m));
-            const enDusukler = res.data.map(m => parseFloat(m));
+            // 🛠️ KESİN DÜZELTME: Binance matris indeksleri (High: 2, Low: 3, Close: 4) milimetrik bağlandı
+            const kapanislar = res.data.map(m => parseFloat(m[4]));
+            const enYuksekler = res.data.map(m => parseFloat(m[2]));
+            const enDusukler = res.data.map(m => parseFloat(m[3]));
             
             const anlikFiyat = kapanislar[kapanislar.length - 1];
             const rsi = hesaplaRSI(kapanislar, 14);
             const ema20 = hesaplaEMA(kapanislar, 20);
 
-            // Son 10 mumun oynaklığına göre dinamik volatilite hesabı
             let toplamMenzil = 0;
             for (let i = res.data.length - 10; i < res.data.length; i++) {
                 toplamMenzil += (enYuksekler[i] - enDusukler[i]);
@@ -120,7 +113,6 @@ async function otomatikScalpTara() {
             let zd = "";
             let riskUyarisi = "";
 
-            // Yapay Zeka Koşul Matrisi (15m Scalp Stratejisi)
             if (rsi < 38 && anlikFiyat > ema20) {
                 sinyalTetiklendi = true;
                 yon = "🟢 AL (LONG)";
@@ -159,8 +151,6 @@ async function otomatikScalpTara() {
                 };
 
                 await bot.sendMessage(CHAT_ID, kcexOtomatikMesaj, { parse_mode: 'Markdown', ...inlineKeyboard }).catch(() => null);
-                
-                // Botun Telegram'a aynı anda çok fazla sinyal yığıp tıkanmasını önleyen koruma
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
 
@@ -169,8 +159,5 @@ async function otomatikScalpTara() {
     console.log("✅ 100 Parite başarıyla tarandı. 15 dakika sonra sonraki döngü başlayacak.");
 }
 
-// Bot tetiklendiği an ilk tarama otopilotta başlar
 otomatikScalpTara();
-
-// Her 15 dakikada bir otomatik arka plan taraması
 setInterval(otomatikScalpTara, 15 * 60 * 1000);
