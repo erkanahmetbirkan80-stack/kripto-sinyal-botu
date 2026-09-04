@@ -10,25 +10,37 @@ const bot = new TelegramBot(TOKEN, { polling: false });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🛠️ KESİN DÜZELTME: Webhook verilerinin Express tarafından tam okunabilmesi için parser genişletildi
+// 🛠️ DÜZELTİLDİ: Express paket okuma katmanları standart hale getirildi
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
 
-// Telegram Webhook Giriş Kapısı (Endpoint)
+// Telegram Webhook Veri Giriş Kapısı
 app.post(`/bot${TOKEN}`, (req, res) => {
-    if (req.body) {
+    res.sendStatus(200); // Telegram'a paketi aldım yanıtı ver (Kritik)
+    if (req.body && req.body.update_id) {
         bot.processUpdate(req.body);
     }
-    res.sendStatus(200);
 });
 
 app.get('/', (req, res) => {
     res.status(200).send('Finora AI Tarzi Interaktif Scalp Motoru Canli.');
 });
 
+// 🛠️ YENİ RESET PANELİ: Tarayıcıdan girip tek tıkla webhook'u tamir edebilmen için eklendi
+app.get('/reset-webhook', async (req, res) => {
+    try {
+        await bot.deleteWebHook();
+        await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
+        res.send("✅ Webhook sıfırlandı ve başarıyla bağlandı! Botunuz tetiklenmeye hazır.");
+    } catch (e) {
+        res.send("❌ Hata oluştu: " + e.message);
+    }
+});
+
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Sunucu ${PORT} portunda aktif.`);
     try {
+        await bot.deleteWebHook(); // Eski kalıntıları temizle
         await bot.setWebHook(`${RENDER_URL}/bot${TOKEN}`);
         console.log("⚡ Telegram Webhook başarıyla bağlandı! Çakışma hatası kalıcı olarak çözüldü.");
     } catch (e) {
@@ -36,7 +48,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     }
 });
 
-// Sunucuyu uyanık tutan ping motoru
+// UYUMAYI ENGELLEYEN PİNG MOTORU
 setInterval(() => {
     axios.get(RENDER_URL).then(() => {
         console.log("Kendi kendine ping atildi, sunucu uyanik tutuluyor.");
@@ -88,25 +100,16 @@ async function getTopSymbols() {
     } catch (error) { return []; }
 }
 
-// 🎯 CANLI ANALİZ KOMUT MOTORU (Yedekli Kelime Yakalama Altyapısı)
-bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
+// 🎯 CANLI ANALİZ KOMUT MOTORU (Yedekli ve Regex Bağımsız Sistem)
+bot.onText(/\/analiz (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     
-    // Güvenli Kelime Süzme (match[1] yoksa doğrudan msg.text üzerinden süzme yapar)
-    let hamGirdi = "";
-    if (match && match[1]) {
-        hamGirdi = match[1];
-    } else if (msg.text) {
-        hamGirdi = msg.text.replace(/\/analiz/i, "");
-    }
-
-    hamGirdi = hamGirdi.toUpperCase().trim();
-
-    if (!hamGirdi) {
+    if (!match || !match[1]) {
         return bot.sendMessage(chatId, "⚠️ Lütfen analiz etmek istediğiniz sembolü belirtin.\nÖrnek: `/analiz SOL`").catch(() => null);
     }
     
-    let gelenCoin = hamGirdi;
+    let gelenCoin = match[1].toUpperCase().trim(); 
+    
     if (!gelenCoin.endsWith('USDT')) {
         gelenCoin = gelenCoin + 'USDT';
     }
@@ -121,7 +124,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
             return bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} sembolü Binance üzerinde bulunamadı veya veri çekilemedi.`);
         }
 
-        const kapanislar = res.data.map(m => parseFloat(m[4])); 
+        const kapanislar = res.data.map(m => parseFloat(m[4])); // Kapanış fiyatı milimetrik çekildi
         const sonIdx = kapanislar.length - 1;
         const anlikFiyat = kapanislar[sonIdx];
 
@@ -155,7 +158,7 @@ bot.onText(/\/analiz(?:\s+(.+))?/, async (msg, match) => {
         bot.sendMessage(chatId, raporMesaji, { parse_mode: 'Markdown' }).catch(() => null);
 
     } catch (error) {
-        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı. Sembolün Binance'de listeli olduğundan emin olun.`).catch(() => null);
+        bot.sendMessage(chatId, `❌ *Hata:* ${gelenCoin} verileri işlenirken borsa hatası alındı.`).catch(() => null);
     }
 });
 
@@ -179,7 +182,7 @@ async function scalpStratejiTara() {
 
             if (isNaN(rsiDegeri) || isNaN(ema20Degeri)) continue;
 
-            let yon = null; let stop = 0; let原型hedef = 0; let hedef = 0;
+            let yon = null; let stop = 0; let hedef = 0;
             if (rsiDegeri < 35 && anlikFiyat > ema20Degeri) {
                 yon = "🟢 LONG (ALIM)"; stop = anlikFiyat * 0.9925; hedef = anlikFiyat * 1.0150;
             } else if (rsiDegeri > 65 && anlikFiyat < ema20Degeri) {
